@@ -21,14 +21,19 @@ async function proxyRequest(request: NextRequest, path: string[]) {
   headers.delete("connection");
   headers.delete("content-length");
 
-  const upstreamResponse = await fetch(buildTargetUrl(request, path), {
+  const upstreamRequestInit: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers,
-    body: request.body,
-    duplex: "half",
     redirect: "manual",
     cache: "no-store",
-  });
+  };
+
+  if (request.body !== null && request.method !== "GET" && request.method !== "HEAD") {
+    upstreamRequestInit.body = request.body;
+    upstreamRequestInit.duplex = "half";
+  }
+
+  const upstreamResponse = await fetch(buildTargetUrl(request, path), upstreamRequestInit);
 
   const responseHeaders = new Headers(upstreamResponse.headers);
 
