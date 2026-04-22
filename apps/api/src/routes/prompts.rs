@@ -5,7 +5,7 @@ use axum::{Json, Router};
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 
-use crate::entities::{category, prompt, user};
+use crate::entities::{category, prompt, review, user};
 use crate::error::ApiError;
 use crate::models::{CategoryResponse, CreatePromptRequest, PromptResponse};
 use crate::state::AppState;
@@ -79,6 +79,7 @@ async fn create_prompt(
         .one(&state.database)
         .await?
         .ok_or(ApiError::Unauthorized)?;
+    let (review_count, average_stars) = prompt_review_metrics(&state, created.id).await?;
 
     Ok((
         StatusCode::CREATED,
@@ -98,8 +99,8 @@ async fn create_prompt(
                     .count(&state.database)
                     .await?,
             },
-            review_count: 0,
-            average_stars: None,
+            review_count,
+            average_stars,
         }),
     ))
 }
@@ -129,6 +130,7 @@ async fn build_prompt_response(
         .one(&state.database)
         .await?
         .ok_or(ApiError::NotFound)?;
+    let (review_count, average_stars) = prompt_review_metrics(state, record.id).await?;
     let prompt_count = prompt::Entity::find()
         .filter(prompt::Column::CategoryId.eq(category_record.id))
         .count(&state.database)
@@ -147,9 +149,26 @@ async fn build_prompt_response(
             description: category_record.description,
             prompt_count,
         },
-        review_count: 0,
-        average_stars: None,
+        review_count,
+        average_stars,
     })
+}
+
+async fn prompt_review_metrics(state: &AppState, prompt_id: i32) -> Result<(u64, Option<f64>), ApiError> {
+    let records = review::Entity::find()
+        .filter(review::Column::PromptId.eq(prompt_id))
+        .all(&state.database)
+        .await?;
+    let review_count = records.len() as u64;
+
+    if review_count == 0 {
+        return Ok((0, None));
+    }
+
+    let total_stars: i64 = records.iter().map(|record| i64::from(record.stars)).sum();
+    let average = (total_stars as f64 / review_count as f64 * 10.0).round() / 10.0;
+
+    Ok((review_count, Some(average)))
 }
 
 async fn unique_prompt_slug(state: &AppState, name: &str) -> Result<String, ApiError> {

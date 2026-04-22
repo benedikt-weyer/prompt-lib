@@ -1,4 +1,10 @@
-import type { CatalogCategory, CatalogPrompt } from "@/lib/types";
+import type {
+  CatalogCategory,
+  CatalogLlmFramework,
+  CatalogLlmModel,
+  CatalogPrompt,
+  CatalogReview,
+} from "@/lib/types";
 
 export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -26,6 +32,52 @@ export async function fetchPrompts(): Promise<CatalogPrompt[]> {
   }
 
   return (await response.json()) as CatalogPrompt[];
+}
+
+export async function fetchLlmFrameworks(): Promise<CatalogLlmFramework[]> {
+  const response = await fetch(`${apiUrl}/api/llm-frameworks`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load LLM frameworks.");
+  }
+
+  return (await response.json()) as CatalogLlmFramework[];
+}
+
+export async function fetchLlmModels(frameworkId?: number): Promise<CatalogLlmModel[]> {
+  const searchParams = new URLSearchParams();
+
+  if (frameworkId !== undefined) {
+    searchParams.set("framework_id", String(frameworkId));
+  }
+
+  const suffix = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
+  const response = await fetch(`${apiUrl}/api/llm-models${suffix}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load LLM models.");
+  }
+
+  return (await response.json()) as CatalogLlmModel[];
+}
+
+export async function fetchReviews(promptId: number): Promise<CatalogReview[]> {
+  const response = await fetch(`${apiUrl}/api/prompts/${promptId}/reviews`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load reviews.");
+  }
+
+  return (await response.json()) as CatalogReview[];
 }
 
 export async function fetchPromptBySlug(slug: string): Promise<CatalogPrompt | null> {

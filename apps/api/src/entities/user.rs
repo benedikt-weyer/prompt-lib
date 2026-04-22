@@ -15,6 +15,10 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::category::Entity")]
     Categories,
+    #[sea_orm(has_many = "super::llm_framework::Entity")]
+    LlmFrameworks,
+    #[sea_orm(has_many = "super::llm_model::Entity")]
+    LlmModels,
     #[sea_orm(has_many = "super::prompt::Entity")]
     Prompts,
     #[sea_orm(has_many = "super::review::Entity")]

@@ -1,6 +1,8 @@
 pub mod auth;
 pub mod categories;
 pub mod health;
+pub mod llm_frameworks;
+pub mod llm_models;
 pub mod prompts;
 pub mod reviews;
 
@@ -44,5 +46,7 @@ fn api_router() -> Router<AppState> {
         .route("/health", get(health::get_health))
         .nest("/auth", auth::router())
         .nest("/categories", categories::router())
+        .nest("/llm-frameworks", llm_frameworks::router())
+        .nest("/llm-models", llm_models::router())
         .nest("/prompts", prompts::router())
 }

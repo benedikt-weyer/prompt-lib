@@ -55,6 +55,12 @@ export default function PromptsPage() {
             <h1 className="mt-2 text-4xl font-semibold tracking-tight">Prompt records with real persisted categories</h1>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Link href="/frameworks/new" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full")}>
+              New framework
+            </Link>
+            <Link href="/models/new" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full")}>
+              New model
+            </Link>
             <Link href="/categories/new" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full")}>
               New category
             </Link>

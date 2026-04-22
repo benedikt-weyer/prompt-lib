@@ -14,6 +14,36 @@ export type CatalogCategory = {
   prompt_count: number;
 };
 
+export type LlmFrameworkSummary = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
+export type CatalogLlmFramework = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  model_count: number;
+};
+
+export type CatalogLlmModel = {
+  id: number;
+  name: string;
+  slug: string;
+  thinking_effort: ThinkingEffort;
+  framework: LlmFrameworkSummary;
+};
+
+export type CatalogReview = {
+  id: number;
+  stars: number;
+  reviewer_name: string;
+  llm_model: CatalogLlmModel;
+  created_at: string;
+};
+
 export type CatalogPrompt = {
   id: number;
   name: string;
