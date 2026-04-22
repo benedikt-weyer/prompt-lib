@@ -198,6 +198,6 @@ The published container tag matches the Git tag name exactly.
 
 ## Notes
 
-- The frontend currently uses the backend API directly via `NEXT_PUBLIC_API_URL`.
+- The frontend proxies backend requests through the Next app and uses `API_URL` as its server-side backend target.
 - The backend expects PostgreSQL via `DATABASE_URL`.
 - GitHub image publishing uses `GITHUB_TOKEN`, so package publishing permissions must remain enabled in the workflow.

@@ -30,7 +30,7 @@ load_env() {
   export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
   export API_PORT="${API_PORT:-4000}"
   export FRONTEND_ORIGIN="${FRONTEND_ORIGIN:-http://localhost:3000}"
-  export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://localhost:4000}"
+  export API_URL="${API_URL:-http://localhost:${API_PORT}}"
   export JWT_SECRET="${JWT_SECRET:-replace-me}"
   export DATABASE_URL="${DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}}"
 }

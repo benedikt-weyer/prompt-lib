@@ -6,9 +6,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
+import { apiUrl } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 
 type SessionPayload = {
@@ -25,9 +27,8 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-export function AuthProvider({ children }: PropsWithChildren) {
+export function AuthProvider({ children }: Readonly<PropsWithChildren>) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,16 +66,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void refreshSession();
   }, [refreshSession]);
 
+  const contextValue = useMemo(
+    () => ({
+      user,
+      loading,
+      refreshSession,
+      setAuthenticatedUser: setUser,
+      logout,
+    }),
+    [user, loading, refreshSession, logout],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        refreshSession,
-        setAuthenticatedUser: setUser,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

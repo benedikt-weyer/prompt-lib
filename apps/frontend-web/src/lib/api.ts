@@ -6,7 +6,7 @@ import type {
   CatalogReview,
 } from "@/lib/types";
 
-export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+export const apiUrl = "/backend";
 
 export async function fetchCategories(): Promise<CatalogCategory[]> {
   const response = await fetch(`${apiUrl}/api/categories`, {

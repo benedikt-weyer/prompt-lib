@@ -8,14 +8,13 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiUrl } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 
 type RegisterResult = {
   message?: string;
   user?: AuthUser;
 };
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export function RegisterForm() {
   const router = useRouter();
