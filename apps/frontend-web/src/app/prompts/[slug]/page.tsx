@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { CheckIcon, CopyIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { CreateReviewForm } from "@/components/reviews/create-review-form";
@@ -66,6 +68,26 @@ async function updatePromptVisibility(prompt: CatalogPrompt) {
     prompt: payload as CatalogPrompt,
     message: null,
   };
+}
+
+async function copyTextToClipboard(text: string) {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+    throw new TypeError("Clipboard is not available.");
+  }
+
+  await navigator.clipboard.writeText(text);
+}
+
+function getCopyButtonLabel(copied: boolean, copyPending: boolean) {
+  if (copied) {
+    return "Copied";
+  }
+
+  if (copyPending) {
+    return "Copying";
+  }
+
+  return "Copy prompt";
 }
 
 function getVisibilityActionLabel(prompt: CatalogPrompt | null, visibilityPending: boolean) {
@@ -207,7 +229,10 @@ function PromptMainSection({
           </div>
           <Card className="border-border/70 bg-card/90">
             <CardHeader>
-              <CardTitle>Prompt body</CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Prompt body</CardTitle>
+                <PromptCopyButton promptText={prompt.prompt} />
+              </div>
             </CardHeader>
             <CardContent>
               <pre className="overflow-x-auto whitespace-pre-wrap rounded-3xl bg-background/80 p-5 font-mono text-sm leading-7 text-foreground">
@@ -246,6 +271,62 @@ function PromptMainSection({
         </>
       ) : null}
     </section>
+  );
+}
+
+function PromptCopyButton({ promptText }: Readonly<{ promptText: string }>) {
+  const [copyPending, setCopyPending] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timeoutId = globalThis.setTimeout(() => {
+      setCopied(false);
+    }, 1800);
+
+    return () => {
+      globalThis.clearTimeout(timeoutId);
+    };
+  }, [copied]);
+
+  async function handleCopyPrompt() {
+    setCopyPending(true);
+    setCopyError(null);
+
+    try {
+      await copyTextToClipboard(promptText);
+      setCopied(true);
+      toast.success("Prompt copied to clipboard.");
+    } catch {
+      setCopyError("Copy to clipboard failed.");
+      toast.error("Copy to clipboard failed.");
+    } finally {
+      setCopyPending(false);
+    }
+  }
+
+  const copyButtonLabel = getCopyButtonLabel(copied, copyPending);
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={copyButtonLabel}
+        title={copyButtonLabel}
+        onClick={handleCopyPrompt}
+        disabled={copyPending}
+        className={"cursor-pointer"}
+      >
+        {copied ? <CheckIcon /> : <CopyIcon />}
+      </Button>
+      {copyError ? <p className="text-sm text-destructive">{copyError}</p> : null}
+    </div>
   );
 }
 
