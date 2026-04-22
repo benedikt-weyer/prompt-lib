@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#c95a2d" />
+    <title>Prompt Lib Offline</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #16110f;
+        --card: #fff8ec;
+        --text: #281c16;
+        --muted: #71564a;
+        --accent: #c95a2d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top left, rgba(240, 201, 122, 0.25), transparent 30%),
+          radial-gradient(circle at 85% 10%, rgba(201, 90, 45, 0.24), transparent 24%),
+          var(--bg);
+        font-family: "Space Grotesk", system-ui, sans-serif;
+      }
+
+      main {
+        width: min(100%, 460px);
+        padding: 28px;
+        border-radius: 24px;
+        background: var(--card);
+        color: var(--text);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 5vw, 2.8rem);
+        line-height: 1.05;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      a {
+        display: inline-flex;
+        margin-top: 20px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff8ec;
+        padding: 12px 18px;
+        text-decoration: none;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline.</h1>
+      <p>
+        Prompt Lib can still reopen cached assets, but fresh prompt data needs a connection.
+        Reconnect and retry when the network is back.
+      </p>
+      <a href="/">Retry</a>
+    </main>
+  </body>
+</html>

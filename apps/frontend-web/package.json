@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate:pwa-icons": "nix-shell -p imagemagick --run 'magick -background none src/app/icon.svg -resize 192x192 public/pwa-192x192.png && magick -background none src/app/icon.svg -resize 512x512 public/pwa-512x512.png && magick -background none src/app/icon.svg -resize 180x180 public/apple-touch-icon.png'"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

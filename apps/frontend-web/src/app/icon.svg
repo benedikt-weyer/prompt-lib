@@ -19,16 +19,4 @@
   <path d="M31 18H43" stroke="#D8B06A" stroke-width="2.5" stroke-linecap="round" />
   <circle cx="47" cy="17" r="8" fill="#FFF2C7" stroke="#42261A" stroke-width="2" />
   <path d="M47 12.8L48.3 15.6L51.4 15.9L49.1 18L49.7 21L47 19.4L44.3 21L44.9 18L42.6 15.9L45.7 15.6L47 12.8Z" fill="#42261A" />
-</svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <defs>
-    <linearGradient id="icon-gradient" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F08A4B" />
-      <stop offset="1" stop-color="#C6542F" />
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="18" fill="#211915" />
-  <rect x="8" y="8" width="48" height="48" rx="14" fill="url(#icon-gradient)" />
-  <path d="M22 22L30 32L22 42" stroke="#FFF7EC" stroke-linecap="round" stroke-linejoin="round" stroke-width="5" />
-  <path d="M35 42H45" stroke="#FFF7EC" stroke-linecap="round" stroke-width="5" />
-  <path d="M41.5 16.5L43.3 20.3L47.5 20.8L44.4 23.6L45.2 27.8L41.5 25.7L37.8 27.8L38.6 23.6L35.5 20.8L39.7 20.3L41.5 16.5Z" fill="#F4D56A" />
 </svg>
