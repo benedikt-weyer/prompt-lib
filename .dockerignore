@@ -1,0 +1,11 @@
+.git
+.github
+.env
+.envrc
+.logs
+.run
+target
+node_modules
+apps/web/node_modules
+apps/web/.next
+**/.DS_Store
