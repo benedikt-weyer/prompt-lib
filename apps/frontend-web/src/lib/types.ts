@@ -51,6 +51,7 @@ export type CatalogReview = {
   id: number;
   reviewer_id: number;
   stars: number;
+  comment: string | null;
   reviewer_name: string;
   llm_model: CatalogLlmModelSummary;
   llm_framework: LlmFrameworkSummary;

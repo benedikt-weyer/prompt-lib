@@ -11,6 +11,7 @@ pub struct Model {
     pub llm_framework_id: i32,
     pub llm_model_thinking_effort_id: i32,
     pub stars: i16,
+    pub comment: Option<String>,
     pub created_at: DateTimeUtc,
 }
 

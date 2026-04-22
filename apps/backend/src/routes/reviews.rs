@@ -76,6 +76,7 @@ async fn create_review(
         llm_framework_id: Set(payload.llm_framework_id),
         llm_model_thinking_effort_id: Set(payload.llm_model_thinking_effort_id),
         stars: Set(payload.stars),
+        comment: Set(normalize_review_comment(payload.comment)),
         created_at: Set(Utc::now()),
         ..Default::default()
     }
@@ -118,6 +119,7 @@ async fn update_review(
     active_model.llm_framework_id = Set(payload.llm_framework_id);
     active_model.llm_model_thinking_effort_id = Set(payload.llm_model_thinking_effort_id);
     active_model.stars = Set(payload.stars);
+    active_model.comment = Set(normalize_review_comment(payload.comment));
     let updated = active_model.update(&state.database).await?;
 
     Ok(Json(build_review_response(&state, updated).await?))
@@ -222,6 +224,18 @@ async fn validate_review_payload(
     Ok(())
 }
 
+fn normalize_review_comment(comment: Option<String>) -> Option<String> {
+    comment.and_then(|value| {
+        let trimmed = value.trim().to_string();
+
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    })
+}
+
 pub async fn build_review_response(
     state: &AppState,
     record: review::Model,
@@ -235,6 +249,7 @@ pub async fn build_review_response(
         id: record.id,
         reviewer_id: record.reviewer_id,
         stars: record.stars,
+        comment: record.comment,
         reviewer_name: reviewer.username,
         llm_model: super::llm_models::build_llm_model_summary_response(
             &llm_model::Entity::find_by_id(record.llm_model_id)

@@ -333,6 +333,12 @@ function PromptMainSection({
                       <p className="mt-3 text-sm text-muted-foreground">
                         Reviewed by {review.reviewer_name} on {new Date(review.created_at).toLocaleDateString()}.
                       </p>
+                      {review.comment ? (
+                        <div className="mt-3 rounded-2xl bg-background/80 px-4 py-3 text-sm leading-7 text-foreground/85">
+                          <p className="mb-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">Comment</p>
+                          <p className="whitespace-pre-wrap">{review.comment}</p>
+                        </div>
+                      ) : null}
                       {currentUserId === review.reviewer_id ? (
                         <div className="mt-4 flex flex-wrap gap-3">
                           <Button

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { apiUrl, fetchLlmFrameworks, fetchLlmModels } from "@/lib/api";
 import type { CatalogLlmFramework, CatalogLlmModel, CatalogReview } from "@/lib/types";
 
@@ -23,6 +24,10 @@ type CreateReviewFormProps = {
 
 function getInitialFieldValue(value: number | undefined) {
   return value === undefined ? "" : String(value);
+}
+
+function getInitialCommentValue(value: string | null | undefined) {
+  return value ?? "";
 }
 
 function getReviewPrerequisiteMessage(models: CatalogLlmModel[], frameworks: CatalogLlmFramework[]) {
@@ -79,12 +84,14 @@ export function CreateReviewForm({
     getInitialFieldValue(initialReview?.llm_framework.id),
   );
   const [selectedStars, setSelectedStars] = useState<string>(getInitialFieldValue(initialReview?.stars));
+  const [comment, setComment] = useState<string>(getInitialCommentValue(initialReview?.comment));
 
   useEffect(() => {
     setSelectedModelId(getInitialFieldValue(initialReview?.llm_model.id));
     setSelectedThinkingEffortId(getInitialFieldValue(initialReview?.thinking_effort.id));
     setSelectedFrameworkId(getInitialFieldValue(initialReview?.llm_framework.id));
     setSelectedStars(getInitialFieldValue(initialReview?.stars));
+    setComment(getInitialCommentValue(initialReview?.comment));
   }, [initialReview]);
 
   useEffect(() => {
@@ -145,11 +152,13 @@ export function CreateReviewForm({
     const modelValue = formData.get("llmModelId");
     const frameworkValue = formData.get("llmFrameworkId");
     const thinkingEffortValue = formData.get("thinkingEffortId");
+    const commentValue = formData.get("comment");
 
     const stars = typeof starsValue === "string" ? Number(starsValue) : Number.NaN;
     const llmModelId = typeof modelValue === "string" ? Number(modelValue) : Number.NaN;
     const llmFrameworkId = typeof frameworkValue === "string" ? Number(frameworkValue) : Number.NaN;
     const thinkingEffortId = typeof thinkingEffortValue === "string" ? Number(thinkingEffortValue) : Number.NaN;
+    const nextComment = typeof commentValue === "string" ? commentValue : "";
 
     try {
       const response = await fetch(
@@ -164,6 +173,7 @@ export function CreateReviewForm({
           credentials: "include",
           body: JSON.stringify({
             stars,
+            comment: nextComment,
             llm_model_id: llmModelId,
             llm_framework_id: llmFrameworkId,
             llm_model_thinking_effort_id: thinkingEffortId,
@@ -187,6 +197,7 @@ export function CreateReviewForm({
         setSelectedThinkingEffortId("");
         setSelectedFrameworkId("");
         setSelectedStars("");
+        setComment("");
       }
 
       startTransition(() => {
@@ -315,6 +326,20 @@ export function CreateReviewForm({
               </option>
             ))}
           </select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="comment">Comment</Label>
+          <Textarea
+            id="comment"
+            name="comment"
+            value={comment}
+            onChange={(event) => {
+              setComment(event.target.value);
+            }}
+            disabled={pending}
+            className="min-h-28"
+            placeholder="Summarize what worked, what failed, and any caveats from this review run."
+          />
         </div>
         <div className="flex flex-wrap gap-3">
           <Button type="submit" disabled={pending || authLoading || loadingModels || loadingFrameworks}>

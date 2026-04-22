@@ -76,6 +76,7 @@ pub struct ReviewResponse {
     pub id: i32,
     pub reviewer_id: i32,
     pub stars: i16,
+    pub comment: Option<String>,
     pub reviewer_name: String,
     pub llm_model: LlmModelSummaryResponse,
     pub llm_framework: LlmFrameworkSummaryResponse,
@@ -197,6 +198,7 @@ pub struct UpdatePromptRequest {
 #[derive(Debug, Deserialize)]
 pub struct CreateReviewRequest {
     pub stars: i16,
+    pub comment: Option<String>,
     pub llm_model_id: i32,
     pub llm_framework_id: i32,
     pub llm_model_thinking_effort_id: i32,
@@ -205,6 +207,7 @@ pub struct CreateReviewRequest {
 #[derive(Debug, Deserialize)]
 pub struct UpdateReviewRequest {
     pub stars: i16,
+    pub comment: Option<String>,
     pub llm_model_id: i32,
     pub llm_framework_id: i32,
     pub llm_model_thinking_effort_id: i32,
