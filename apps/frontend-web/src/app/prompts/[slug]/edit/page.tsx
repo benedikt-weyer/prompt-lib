@@ -56,7 +56,7 @@ export default function EditPromptPage() {
           <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Prompts</p>
           <h1 className="text-4xl font-semibold tracking-tight">Edit prompt</h1>
           <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
-            Update the prompt text, category, and visibility. If you rename it, the slug will update too.
+            Update the main prompt, any follow-up prompts, category, and visibility. If you rename it, the slug will update too.
           </p>
         </div>
         <Card className="border-border/70 bg-card/95">

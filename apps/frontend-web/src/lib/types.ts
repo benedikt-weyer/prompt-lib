@@ -60,12 +60,19 @@ export type CatalogReview = {
   created_at: string;
 };
 
+export type CatalogPromptFollowUp = {
+  id: number;
+  position: number;
+  body: string;
+};
+
 export type CatalogPrompt = {
   id: number;
   creator_id: number;
   name: string;
   slug: string;
   prompt: string;
+  follow_up_prompts: CatalogPromptFollowUp[];
   execution_type: PromptExecutionType;
   is_public: boolean;
   author_name: string;

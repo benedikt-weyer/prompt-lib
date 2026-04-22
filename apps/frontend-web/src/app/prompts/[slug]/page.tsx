@@ -291,6 +291,9 @@ function PromptMainSection({
           <div className="flex flex-wrap gap-2">
             <Badge className="rounded-full bg-secondary text-secondary-foreground">{prompt.category.name}</Badge>
             <Badge variant="outline" className="rounded-full">{prompt.review_count} review runs</Badge>
+            {prompt.follow_up_prompts.length > 0 ? (
+              <Badge variant="outline" className="rounded-full">{prompt.follow_up_prompts.length} follow-ups</Badge>
+            ) : null}
             <Badge variant="outline" className="rounded-full">
               {getPromptExecutionTypeLabel(prompt.execution_type)}
             </Badge>
@@ -316,6 +319,30 @@ function PromptMainSection({
               <pre className="overflow-x-auto whitespace-pre-wrap rounded-3xl bg-background/80 p-5 font-mono text-sm leading-7 text-foreground">
                 {prompt.prompt}
               </pre>
+            </CardContent>
+          </Card>
+          <Card className="border-border/70 bg-card/90">
+            <CardHeader>
+              <CardTitle>Follow-up prompts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {prompt.follow_up_prompts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No follow-up prompts were defined for this prompt.
+                </p>
+              ) : (
+                prompt.follow_up_prompts.map((followUpPrompt) => (
+                  <div key={followUpPrompt.id} className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground">Follow-up {followUpPrompt.position}</p>
+                      <PromptCopyButton promptText={followUpPrompt.body} />
+                    </div>
+                    <pre className="overflow-x-auto whitespace-pre-wrap rounded-2xl bg-background/80 p-4 font-mono text-sm leading-7 text-foreground">
+                      {followUpPrompt.body}
+                    </pre>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
           <Card className="border-border/70 bg-card/90">

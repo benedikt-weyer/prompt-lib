@@ -53,6 +53,9 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [followUpPrompts, setFollowUpPrompts] = useState<string[]>(
+    initialPrompt?.follow_up_prompts.map((followUpPrompt) => followUpPrompt.body) ?? [],
+  );
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,11 +98,15 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
     const promptValue = formData.get("prompt");
     const categoryValue = formData.get("categoryId");
     const executionTypeValue = formData.get("executionType");
+    const followUpPromptValues = formData.getAll("followUpPrompt");
     const visibilityValue = formData.get("visibility");
 
     const name = typeof nameValue === "string" ? nameValue.trim() : "";
     const prompt = typeof promptValue === "string" ? promptValue.trim() : "";
     const categoryId = typeof categoryValue === "string" ? Number(categoryValue) : Number.NaN;
+    const nextFollowUpPrompts = followUpPromptValues
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter((value) => value.length > 0);
     const executionType: PromptExecutionType =
       executionTypeValue === "agent" ||
       executionTypeValue === "plan" ||
@@ -121,6 +128,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
         body: JSON.stringify({
           name,
           prompt,
+          follow_up_prompts: nextFollowUpPrompts,
           category_id: categoryId,
           execution_type: executionType,
           is_public: isPublic,
@@ -144,6 +152,24 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
     } finally {
       setPending(false);
     }
+  }
+
+  function updateFollowUpPrompt(index: number, value: string) {
+    setFollowUpPrompts((currentFollowUpPrompts) =>
+      currentFollowUpPrompts.map((followUpPrompt, currentIndex) =>
+        currentIndex === index ? value : followUpPrompt,
+      ),
+    );
+  }
+
+  function addFollowUpPrompt() {
+    setFollowUpPrompts((currentFollowUpPrompts) => [...currentFollowUpPrompts, ""]);
+  }
+
+  function removeFollowUpPrompt(index: number) {
+    setFollowUpPrompts((currentFollowUpPrompts) =>
+      currentFollowUpPrompts.filter((_, currentIndex) => currentIndex !== index),
+    );
   }
 
   if (!authLoading && !user) {
@@ -212,6 +238,55 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             disabled={pending}
             required
           />
+        </div>
+        <div className="grid gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1">
+              <Label>Follow-up prompts</Label>
+              <p className="text-sm text-muted-foreground">
+                Add optional follow-up prompts that should run after the main prompt body.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={addFollowUpPrompt} disabled={pending}>
+              Add follow-up
+            </Button>
+          </div>
+          {followUpPrompts.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
+              No follow-up prompts yet. Add one if this prompt should continue as a sequence.
+            </p>
+          ) : null}
+          <div className="grid gap-4">
+            {followUpPrompts.map((followUpPrompt, index) => (
+              <div key={`follow-up-${index + 1}`} className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <Label htmlFor={`followUpPrompt-${index + 1}`}>Follow-up {index + 1}</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      removeFollowUpPrompt(index);
+                    }}
+                    disabled={pending}
+                  >
+                    Remove
+                  </Button>
+                </div>
+                <Textarea
+                  id={`followUpPrompt-${index + 1}`}
+                  name="followUpPrompt"
+                  className="min-h-32"
+                  placeholder="Write the follow-up prompt that should run next."
+                  value={followUpPrompt}
+                  onChange={(event) => {
+                    updateFollowUpPrompt(index, event.target.value);
+                  }}
+                  disabled={pending}
+                />
+              </div>
+            ))}
+          </div>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="executionType">Execution type</Label>

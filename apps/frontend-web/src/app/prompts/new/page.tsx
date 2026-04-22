@@ -11,7 +11,7 @@ export default function NewPromptPage() {
           <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Prompts</p>
           <h1 className="text-4xl font-semibold tracking-tight">Create a prompt</h1>
           <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
-            Pick a category, write the prompt body, and store it as a real catalog record tied to your account.
+            Pick a category, write the main prompt body, and add any follow-up prompts that should continue the interaction.
           </p>
         </div>
         <Card className="border-border/70 bg-card/95">

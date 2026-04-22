@@ -98,6 +98,9 @@ export default function PromptsPage() {
                 <div className="flex flex-wrap gap-2">
                   <Badge className="rounded-full bg-secondary text-secondary-foreground">{prompt.category.name}</Badge>
                   <Badge variant="outline" className="rounded-full">{prompt.review_count} reviews</Badge>
+                  {prompt.follow_up_prompts.length > 0 ? (
+                    <Badge variant="outline" className="rounded-full">{prompt.follow_up_prompts.length} follow-ups</Badge>
+                  ) : null}
                   <Badge variant="outline" className="rounded-full">{getPromptExecutionTypeLabel(prompt.execution_type)}</Badge>
                   <Badge variant="outline" className="rounded-full">
                     {prompt.is_public ? "Public" : "Private"}

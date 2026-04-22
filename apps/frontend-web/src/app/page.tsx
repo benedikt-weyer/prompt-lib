@@ -239,6 +239,9 @@ export default function Home() {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="rounded-full">Public</Badge>
                     <Badge variant="outline" className="rounded-full">{prompt.review_count} reviews</Badge>
+                    {prompt.follow_up_prompts.length > 0 ? (
+                      <Badge variant="outline" className="rounded-full">{prompt.follow_up_prompts.length} follow-ups</Badge>
+                    ) : null}
                     <Badge variant="outline" className="rounded-full">{getPromptExecutionTypeLabel(prompt.execution_type)}</Badge>
                   </div>
                   <CardTitle className="text-2xl">{prompt.name}</CardTitle>

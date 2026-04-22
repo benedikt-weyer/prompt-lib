@@ -3,13 +3,16 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, patch};
 use axum::{Json, Router};
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
+    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+};
 
-use crate::entities::{category, prompt, review, user};
+use crate::entities::{category, prompt, prompt_follow_up, review, user};
 use crate::error::ApiError;
 use crate::models::{
-    CategoryResponse, CreatePromptRequest, PromptExecutionType, PromptResponse,
-    UpdatePromptRequest, UpdatePromptVisibilityRequest,
+    CategoryResponse, CreatePromptRequest, PromptExecutionType, PromptFollowUpResponse,
+    PromptResponse, UpdatePromptRequest, UpdatePromptVisibilityRequest,
 };
 use crate::state::AppState;
 
@@ -70,6 +73,7 @@ async fn create_prompt(
     let creator_id = super::auth::current_user_id_from_headers(&state, &headers)?;
     let name = payload.name.trim().to_string();
     let prompt_body = payload.prompt.trim().to_string();
+    let follow_up_prompts = sanitize_follow_up_prompts(payload.follow_up_prompts);
 
     if name.is_empty() || prompt_body.is_empty() {
         return Err(ApiError::Validation(
@@ -96,6 +100,8 @@ async fn create_prompt(
         ));
     }
 
+    let transaction = state.database.begin().await?;
+
     let created = prompt::ActiveModel {
         creator_id: Set(creator_id),
         category_id: Set(payload.category_id),
@@ -108,8 +114,11 @@ async fn create_prompt(
         updated_at: Set(Utc::now()),
         ..Default::default()
     }
-    .insert(&state.database)
+    .insert(&transaction)
     .await?;
+
+    store_prompt_follow_ups(&transaction, created.id, &follow_up_prompts).await?;
+    transaction.commit().await?;
 
     Ok((
         StatusCode::CREATED,
@@ -151,6 +160,7 @@ async fn update_prompt(
     let creator_id = super::auth::current_user_id_from_headers(&state, &headers)?;
     let name = payload.name.trim().to_string();
     let prompt_body = payload.prompt.trim().to_string();
+    let follow_up_prompts = sanitize_follow_up_prompts(payload.follow_up_prompts);
 
     if name.is_empty() || prompt_body.is_empty() {
         return Err(ApiError::Validation(
@@ -190,6 +200,7 @@ async fn update_prompt(
         ));
     }
 
+    let transaction = state.database.begin().await?;
     let mut active_model = record.into_active_model();
     active_model.category_id = Set(payload.category_id);
     active_model.name = Set(name);
@@ -198,7 +209,14 @@ async fn update_prompt(
     active_model.execution_type = Set(payload.execution_type.as_str().to_string());
     active_model.is_public = Set(payload.is_public);
     active_model.updated_at = Set(Utc::now());
-    let updated = active_model.update(&state.database).await?;
+    let updated = active_model.update(&transaction).await?;
+
+    prompt_follow_up::Entity::delete_many()
+        .filter(prompt_follow_up::Column::PromptId.eq(updated.id))
+        .exec(&transaction)
+        .await?;
+    store_prompt_follow_ups(&transaction, updated.id, &follow_up_prompts).await?;
+    transaction.commit().await?;
 
     Ok(Json(build_prompt_response(&state, updated, Some(creator_id)).await?))
 }
@@ -250,6 +268,11 @@ async fn build_prompt_response(
         .one(&state.database)
         .await?
         .ok_or(ApiError::NotFound)?;
+    let follow_up_records = prompt_follow_up::Entity::find()
+        .filter(prompt_follow_up::Column::PromptId.eq(record.id))
+        .order_by_asc(prompt_follow_up::Column::Position)
+        .all(&state.database)
+        .await?;
     let author = user::Entity::find_by_id(record.creator_id)
         .one(&state.database)
         .await?
@@ -267,6 +290,14 @@ async fn build_prompt_response(
         name: record.name,
         slug: record.slug,
         prompt: record.prompt,
+        follow_up_prompts: follow_up_records
+            .into_iter()
+            .map(|follow_up| PromptFollowUpResponse {
+                id: follow_up.id,
+                position: follow_up.position,
+                body: follow_up.body,
+            })
+            .collect(),
         execution_type: PromptExecutionType::from_db(&record.execution_type),
         is_public: record.is_public,
         author_name: author.username,
@@ -366,4 +397,34 @@ fn slugify(input: &str) -> String {
     }
 
     slug.trim_matches('-').to_string()
+}
+
+fn sanitize_follow_up_prompts(values: Vec<String>) -> Vec<String> {
+    values
+        .into_iter()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+async fn store_prompt_follow_ups<C>(
+    connection: &C,
+    prompt_id: i32,
+    follow_up_prompts: &[String],
+) -> Result<(), ApiError>
+where
+    C: ConnectionTrait,
+{
+    for (index, body) in follow_up_prompts.iter().enumerate() {
+        prompt_follow_up::ActiveModel {
+            prompt_id: Set(prompt_id),
+            position: Set(index as i32 + 1),
+            body: Set(body.clone()),
+            ..Default::default()
+        }
+        .insert(connection)
+        .await?;
+    }
+
+    Ok(())
 }
