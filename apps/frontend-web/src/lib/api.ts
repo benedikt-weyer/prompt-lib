@@ -4,9 +4,71 @@ import type {
   CatalogLlmModel,
   CatalogPrompt,
   CatalogReview,
+  PromptExecutionType,
 } from "@/lib/types";
 
 export const apiUrl = "/backend";
+
+export type PromptMutationPayload = {
+  category_id: number;
+  name: string;
+  prompt: string;
+  follow_up_prompts: string[];
+  proposed_improvement_prompt_ids: number[];
+  execution_type: PromptExecutionType;
+  is_public: boolean;
+};
+
+async function parsePromptMutationResponse(response: Response): Promise<CatalogPrompt> {
+  const payload = (await response.json().catch(() => null)) as CatalogPrompt | { message?: string } | null;
+
+  if (!response.ok) {
+    throw new Error(payload && "message" in payload ? payload.message ?? "Prompt request failed." : "Prompt request failed.");
+  }
+
+  return payload as CatalogPrompt;
+}
+
+export function buildPromptMutationPayload(
+  prompt: CatalogPrompt,
+  proposedImprovementPromptIds = prompt.proposed_improvement_prompts.map((proposedImprovementPrompt) => proposedImprovementPrompt.id),
+): PromptMutationPayload {
+  return {
+    category_id: prompt.category.id,
+    name: prompt.name,
+    prompt: prompt.prompt,
+    follow_up_prompts: prompt.follow_up_prompts.map((followUpPrompt) => followUpPrompt.body),
+    proposed_improvement_prompt_ids: proposedImprovementPromptIds,
+    execution_type: prompt.execution_type,
+    is_public: prompt.is_public,
+  };
+}
+
+export async function createPrompt(payload: PromptMutationPayload): Promise<CatalogPrompt> {
+  const response = await fetch(`${apiUrl}/api/prompts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  return parsePromptMutationResponse(response);
+}
+
+export async function updatePrompt(promptId: number, payload: PromptMutationPayload): Promise<CatalogPrompt> {
+  const response = await fetch(`${apiUrl}/api/prompts/${promptId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  return parsePromptMutationResponse(response);
+}
 
 export async function fetchCategories(): Promise<CatalogCategory[]> {
   const response = await fetch(`${apiUrl}/api/categories`, {
@@ -47,8 +109,7 @@ export async function fetchLlmFrameworks(): Promise<CatalogLlmFramework[]> {
   return (await response.json()) as CatalogLlmFramework[];
 }
 
-export async function fetchLlmModels(frameworkId?: number): Promise<CatalogLlmModel[]> {
-  void frameworkId;
+export async function fetchLlmModels(): Promise<CatalogLlmModel[]> {
 
   const response = await fetch(`${apiUrl}/api/llm-models`, {
     cache: "no-store",

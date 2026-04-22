@@ -3,19 +3,16 @@
 import Link from "next/link";
 import { type ReactNode, startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl, fetchCategories, fetchPrompts } from "@/lib/api";
+import { buildPromptMutationPayload, createPrompt, fetchCategories, fetchPrompts, updatePrompt } from "@/lib/api";
 import { getPromptExecutionTypeLabel, promptExecutionTypeOptions } from "@/lib/prompt-execution-type";
 import type { CatalogCategory, CatalogPrompt, PromptExecutionType } from "@/lib/types";
-
-type CreatePromptResult = CatalogPrompt & {
-  message?: string;
-};
 
 function buildCategoryLabel(category: CatalogCategory, categoriesById: Map<number, CatalogCategory>) {
   const parts = [category.name];
@@ -47,15 +44,18 @@ function getSubmitButtonLabel(isEditMode: boolean, pending: boolean) {
 
 type CreatePromptFormProps = {
   initialPrompt?: CatalogPrompt;
+  sourcePromptForImprovement?: CatalogPrompt;
 };
 
-export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormProps>) {
+export function CreatePromptForm({ initialPrompt, sourcePromptForImprovement }: Readonly<CreatePromptFormProps>) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [prompts, setPrompts] = useState<CatalogPrompt[]>([]);
   const [followUpPrompts, setFollowUpPrompts] = useState<string[]>(
-    initialPrompt?.follow_up_prompts.map((followUpPrompt) => followUpPrompt.body) ?? [],
+    initialPrompt?.follow_up_prompts.map((followUpPrompt) => followUpPrompt.body)
+      ?? sourcePromptForImprovement?.follow_up_prompts.map((followUpPrompt) => followUpPrompt.body)
+      ?? [],
   );
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingPrompts, setLoadingPrompts] = useState(true);
@@ -69,9 +69,16 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
     [initialPrompt?.proposed_improvement_prompts],
   );
   const availableImprovementPrompts = useMemo(
-    () => prompts.filter((prompt) => prompt.id !== initialPrompt?.id),
-    [initialPrompt?.id, prompts],
+    () => prompts.filter(
+      (prompt) => prompt.id !== initialPrompt?.id && prompt.id !== sourcePromptForImprovement?.id,
+    ),
+    [initialPrompt?.id, prompts, sourcePromptForImprovement?.id],
   );
+  const defaultName = initialPrompt?.name ?? sourcePromptForImprovement?.name;
+  const defaultPromptBody = initialPrompt?.prompt ?? sourcePromptForImprovement?.prompt;
+  const defaultCategoryId = initialPrompt?.category.id ?? sourcePromptForImprovement?.category.id;
+  const defaultExecutionType = initialPrompt?.execution_type ?? sourcePromptForImprovement?.execution_type ?? "unknown";
+  const defaultVisibility = initialPrompt?.is_public ?? sourcePromptForImprovement?.is_public ?? false;
 
   useEffect(() => {
     let cancelled = false;
@@ -131,41 +138,47 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
         ? executionTypeValue
         : "unknown";
     const isPublic = visibilityValue === "public";
+    const payload = {
+      name,
+      prompt,
+      follow_up_prompts: nextFollowUpPrompts,
+      category_id: categoryId,
+      proposed_improvement_prompt_ids: proposedImprovementPromptIds,
+      execution_type: executionType,
+      is_public: isPublic,
+    };
 
     try {
-      const response = await fetch(
-        isEditMode ? `${apiUrl}/api/prompts/${initialPrompt.id}` : `${apiUrl}/api/prompts`,
-        {
-          method: isEditMode ? "PATCH" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            name,
-            prompt,
-            follow_up_prompts: nextFollowUpPrompts,
-            category_id: categoryId,
-            proposed_improvement_prompt_ids: proposedImprovementPromptIds,
-            execution_type: executionType,
-            is_public: isPublic,
-          }),
-        },
-      );
+      const savedPrompt = isEditMode
+        ? await updatePrompt(initialPrompt.id, payload)
+        : await createPrompt(payload);
 
-      const result = (await response.json().catch(() => null)) as CreatePromptResult | null;
+      if (!isEditMode && sourcePromptForImprovement) {
+        const currentImprovementIds = sourcePromptForImprovement.proposed_improvement_prompts.map(
+          (proposedImprovementPrompt) => proposedImprovementPrompt.id,
+        );
 
-      if (!response.ok) {
-        setError(result?.message ?? (isEditMode ? "Prompt update failed." : "Prompt creation failed."));
-        return;
+        await updatePrompt(
+          sourcePromptForImprovement.id,
+          buildPromptMutationPayload(sourcePromptForImprovement, [...currentImprovementIds, savedPrompt.id]),
+        );
+        toast.success("Prompt created and linked as a proposed improvement.");
+      } else if (isEditMode) {
+        toast.success("Prompt updated.");
+      } else {
+        toast.success("Prompt created.");
       }
 
       startTransition(() => {
-        router.push(`/prompts/${result?.slug ?? ""}`);
+        router.push(`/prompts/${savedPrompt.slug}`);
         router.refresh();
       });
-    } catch {
-      setError("The API could not be reached. Confirm the backend is running and try again.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "The API could not be reached. Confirm the backend is running and try again.",
+      );
     } finally {
       setPending(false);
     }
@@ -253,7 +266,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             id="name"
             name="name"
             placeholder="Architecture Risk Review"
-            defaultValue={initialPrompt?.name}
+            defaultValue={defaultName}
             disabled={pending}
             required
           />
@@ -266,7 +279,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             disabled={pending || loadingCategories}
             required
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue={initialPrompt ? String(initialPrompt.category.id) : ""}
+            defaultValue={defaultCategoryId ? String(defaultCategoryId) : ""}
           >
             <option value="" disabled>
               {loadingCategories ? "Loading categories..." : "Select a category"}
@@ -285,7 +298,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             name="prompt"
             className="min-h-48"
             placeholder="Write the prompt exactly as you want to store it."
-            defaultValue={initialPrompt?.prompt}
+            defaultValue={defaultPromptBody}
             disabled={pending}
             required
           />
@@ -353,7 +366,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             name="executionType"
             disabled={pending}
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue={initialPrompt?.execution_type ?? "unknown"}
+            defaultValue={defaultExecutionType}
           >
             {promptExecutionTypeOptions.map((executionType) => (
               <option key={executionType} value={executionType}>
@@ -372,7 +385,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             name="visibility"
             disabled={pending}
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue={initialPrompt?.is_public ? "public" : "private"}
+            defaultValue={defaultVisibility ? "public" : "private"}
           >
             <option value="private">Private</option>
             <option value="public">Public</option>

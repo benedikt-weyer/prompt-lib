@@ -12,7 +12,8 @@ import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiUrl, fetchPromptBySlug, fetchReviews } from "@/lib/api";
+import { Label } from "@/components/ui/label";
+import { apiUrl, buildPromptMutationPayload, fetchPromptBySlug, fetchPrompts, fetchReviews, updatePrompt } from "@/lib/api";
 import { getPromptExecutionTypeLabel } from "@/lib/prompt-execution-type";
 import type { CatalogPrompt, CatalogReview } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -208,6 +209,7 @@ function usePromptDetail(slug: string) {
     handleReviewUpdated,
     handleReviewDeleted,
     toggleVisibility,
+    setPrompt,
   };
 }
 
@@ -524,6 +526,7 @@ function PromptSidebar({
   deletePending,
   deleteError,
   onReviewCreated,
+  onPromptUpdated,
 }: Readonly<{
   prompt: CatalogPrompt | null;
   isOwner: boolean;
@@ -534,6 +537,7 @@ function PromptSidebar({
   deletePending: boolean;
   deleteError: string | null;
   onReviewCreated: (review: CatalogReview) => void;
+  onPromptUpdated: (prompt: CatalogPrompt | null) => void;
 }>) {
   const visibilityActionLabel = getVisibilityActionLabel(prompt, visibilityPending);
 
@@ -572,6 +576,7 @@ function PromptSidebar({
               </Button>
             </div>
           ) : null}
+          {prompt && isOwner ? <PromptImprovementActions prompt={prompt} onPromptUpdated={onPromptUpdated} /> : null}
           {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
           {prompt ? <CreateReviewForm promptId={prompt.id} onSaved={onReviewCreated} /> : null}
           <div className="flex flex-wrap gap-3">
@@ -594,6 +599,161 @@ function PromptSidebar({
   );
 }
 
+function PromptImprovementActions({
+  prompt,
+  onPromptUpdated,
+}: Readonly<{
+  prompt: CatalogPrompt;
+  onPromptUpdated: (prompt: CatalogPrompt) => void;
+}>) {
+  const [open, setOpen] = useState(false);
+  const [availablePrompts, setAvailablePrompts] = useState<CatalogPrompt[]>([]);
+  const [loadingPrompts, setLoadingPrompts] = useState(false);
+  const [selectedPromptId, setSelectedPromptId] = useState<string>("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadAvailablePrompts() {
+      setLoadingPrompts(true);
+      setError(null);
+
+      try {
+        const loadedPrompts = await fetchPrompts();
+
+        if (!cancelled) {
+          setAvailablePrompts(loadedPrompts);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Failed to load prompts.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingPrompts(false);
+        }
+      }
+    }
+
+    void loadAvailablePrompts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const linkedPromptIds = new Set(prompt.proposed_improvement_prompts.map((proposedImprovementPrompt) => proposedImprovementPrompt.id));
+  const linkablePrompts = availablePrompts.filter(
+    (availablePrompt) => availablePrompt.id !== prompt.id && !linkedPromptIds.has(availablePrompt.id),
+  );
+
+  async function handleAddExistingPrompt() {
+    if (!selectedPromptId) {
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+
+    try {
+      const nextPrompt = await updatePrompt(
+        prompt.id,
+        buildPromptMutationPayload(prompt, [...linkedPromptIds, Number(selectedPromptId)]),
+      );
+
+      onPromptUpdated(nextPrompt);
+      setSelectedPromptId("");
+      setOpen(false);
+      toast.success("Existing prompt linked as a proposed improvement.");
+    } catch (linkError) {
+      setError(linkError instanceof Error ? linkError.message : "Failed to link the selected prompt.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-medium text-foreground">Propose an improvement</p>
+          <p className="text-sm text-muted-foreground">
+            Link an existing prompt or create a new prompt prefilled from this one.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setOpen((currentOpen) => !currentOpen);
+            setError(null);
+          }}
+        >
+          {open ? "Close" : "Propose improvement"}
+        </Button>
+      </div>
+      {open ? (
+        <div className="mt-4 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="existingImprovementPromptId">Add existing prompt</Label>
+            <select
+              id="existingImprovementPromptId"
+              value={selectedPromptId}
+              onChange={(event) => {
+                setSelectedPromptId(event.target.value);
+              }}
+              disabled={pending || loadingPrompts}
+              className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground"
+            >
+              <option value="">{loadingPrompts ? "Loading prompts..." : "Select an existing prompt"}</option>
+              {linkablePrompts.map((availablePrompt) => (
+                <option key={availablePrompt.id} value={availablePrompt.id}>
+                  {availablePrompt.name}
+                </option>
+              ))}
+            </select>
+            {linkablePrompts.length === 0 && !loadingPrompts ? (
+              <p className="text-sm text-muted-foreground">
+                No additional prompts are currently available to link.
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending || !selectedPromptId}
+              onClick={async () => {
+                await handleAddExistingPrompt();
+              }}
+            >
+              {pending ? "Linking..." : "Add existing prompt"}
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <p className="font-medium text-foreground">Create a new improvement prompt</p>
+            <p className="text-sm text-muted-foreground">
+              Start a new prompt using this prompt’s current content as the initial draft.
+            </p>
+            <Link
+              href={`/prompts/new?sourcePrompt=${encodeURIComponent(prompt.slug)}`}
+              className={cn(buttonVariants({ size: "sm" }), "rounded-full")}
+            >
+              Create prefilled prompt
+            </Link>
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function PromptDetailPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
@@ -610,6 +770,7 @@ export default function PromptDetailPage() {
     handleReviewUpdated,
     handleReviewDeleted,
     toggleVisibility,
+    setPrompt,
   } = usePromptDetail(params.slug);
   const isOwner = prompt !== null && user?.id === prompt.creator_id;
   const [deletePending, setDeletePending] = useState(false);
@@ -672,6 +833,7 @@ export default function PromptDetailPage() {
           deletePending={deletePending}
           deleteError={deleteError}
           onReviewCreated={handleReviewCreated}
+          onPromptUpdated={setPrompt}
         />
       </main>
     </div>
