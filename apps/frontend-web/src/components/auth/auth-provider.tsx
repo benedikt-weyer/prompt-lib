@@ -63,7 +63,17 @@ export function AuthProvider({ children }: Readonly<PropsWithChildren>) {
   }, []);
 
   useEffect(() => {
-    void refreshSession();
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshSession();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshSession]);
 
   const contextValue = useMemo(

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -68,6 +68,25 @@ export function CreateReviewForm({
   initialReview,
   onCancel,
 }: Readonly<CreateReviewFormProps>) {
+  const formKey = initialReview ? `review-${initialReview.id}` : `prompt-${promptId}`;
+
+  return (
+    <CreateReviewFormInner
+      key={formKey}
+      promptId={promptId}
+      onSaved={onSaved}
+      initialReview={initialReview}
+      onCancel={onCancel}
+    />
+  );
+}
+
+function CreateReviewFormInner({
+  promptId,
+  onSaved,
+  initialReview,
+  onCancel,
+}: Readonly<CreateReviewFormProps>) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [models, setModels] = useState<CatalogLlmModel[]>([]);
@@ -85,14 +104,6 @@ export function CreateReviewForm({
   );
   const [selectedStars, setSelectedStars] = useState<string>(getInitialFieldValue(initialReview?.stars));
   const [comment, setComment] = useState<string>(getInitialCommentValue(initialReview?.comment));
-
-  useEffect(() => {
-    setSelectedModelId(getInitialFieldValue(initialReview?.llm_model.id));
-    setSelectedThinkingEffortId(getInitialFieldValue(initialReview?.thinking_effort.id));
-    setSelectedFrameworkId(getInitialFieldValue(initialReview?.llm_framework.id));
-    setSelectedStars(getInitialFieldValue(initialReview?.stars));
-    setComment(getInitialCommentValue(initialReview?.comment));
-  }, [initialReview]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,23 +136,20 @@ export function CreateReviewForm({
   }, []);
 
   const selectedModel = models.find((model) => String(model.id) === selectedModelId) ?? null;
-  const availableThinkingEfforts = selectedModel?.thinking_efforts ?? [];
-
-  useEffect(() => {
+  const availableThinkingEfforts = useMemo(
+    () => selectedModel?.thinking_efforts ?? [],
+    [selectedModel],
+  );
+  const effectiveThinkingEffortId = useMemo(() => {
     if (selectedModel === null) {
-      if (selectedThinkingEffortId !== "") {
-        setSelectedThinkingEffortId("");
-      }
-      return;
+      return "";
     }
 
-    const hasSelectedThinkingEffort = availableThinkingEfforts.some(
+    return availableThinkingEfforts.some(
       (thinkingEffort) => String(thinkingEffort.id) === selectedThinkingEffortId,
-    );
-
-    if (!hasSelectedThinkingEffort && selectedThinkingEffortId !== "") {
-      setSelectedThinkingEffortId("");
-    }
+    )
+      ? selectedThinkingEffortId
+      : "";
   }, [availableThinkingEfforts, selectedModel, selectedThinkingEffortId]);
 
   async function submitReview(formData: FormData) {
@@ -266,7 +274,7 @@ export function CreateReviewForm({
             disabled={pending || loadingModels || selectedModel === null}
             required
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            value={selectedThinkingEffortId}
+            value={effectiveThinkingEffortId}
             onChange={(event) => {
               setSelectedThinkingEffortId(event.target.value);
             }}
