@@ -13,6 +13,9 @@ target/
 .env
 .env.*
 !.env.example
+.direnv/
+.logs/
+.run/
 
 # OS and editor
 .DS_Store

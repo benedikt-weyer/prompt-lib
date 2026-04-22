@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+load_env
+ensure_dirs
+require_command docker
+
+stop_pid_file "$RUN_DIR/api.pid" "Axum API"
+stop_pid_file "$RUN_DIR/web.pid" "Next.js web"
+
+echo "Stopping PostgreSQL via Docker Compose..."
+docker compose -f "$REPO_ROOT/compose.yaml" down
+
+echo "Prompt Lib is stopped."

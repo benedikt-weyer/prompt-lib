@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+load_env
+ensure_dirs
+require_command docker
+require_command pnpm
+require_command cargo
+require_cargo_watch
+
+echo "Starting PostgreSQL via Docker Compose..."
+docker compose -f "$REPO_ROOT/compose.yaml" up -d db
+wait_for_postgres
+
+start_background \
+  "Axum API" \
+  "$RUN_DIR/api.pid" \
+  "$LOG_DIR/api.log" \
+  cargo watch -x "run --manifest-path apps/api/Cargo.toml"
+
+start_background \
+  "Next.js web" \
+  "$RUN_DIR/web.pid" \
+  "$LOG_DIR/web.log" \
+  pnpm --dir apps/web dev
+
+cat <<EOF
+Prompt Lib is starting.
+
+- PostgreSQL: localhost:${POSTGRES_PORT}
+- API: http://localhost:${API_PORT}
+- Web: http://localhost:3000
+
+Logs:
+- $LOG_DIR/api.log
+- $LOG_DIR/web.log
+EOF
