@@ -10,6 +10,8 @@ use thiserror::Error;
 pub enum ApiError {
     #[error("resource not found")]
     NotFound,
+    #[error("conflict: {0}")]
+    Conflict(String),
     #[error("unauthorized")]
     Unauthorized,
     #[error("validation failed: {0}")]
@@ -32,6 +34,7 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = match self {
             Self::NotFound => StatusCode::NOT_FOUND,
+            Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Validation(_) => StatusCode::BAD_REQUEST,
             Self::Database(_) | Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
@@ -40,6 +43,7 @@ impl IntoResponse for ApiError {
 
         let error = match status {
             StatusCode::NOT_FOUND => "not_found",
+            StatusCode::CONFLICT => "conflict",
             StatusCode::UNAUTHORIZED => "unauthorized",
             StatusCode::BAD_REQUEST => "validation_error",
             StatusCode::NOT_IMPLEMENTED => "not_implemented",

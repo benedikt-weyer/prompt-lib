@@ -25,6 +25,7 @@ pub fn app_router(state: AppState) -> Router {
         .layer(
             CorsLayer::new()
                 .allow_origin(origin)
+                .allow_credentials(true)
                 .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
                 .allow_methods([
                     Method::GET,

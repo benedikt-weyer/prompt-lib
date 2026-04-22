@@ -7,6 +7,20 @@ pub struct FeatureStatusResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct AuthUserResponse {
+    pub id: i32,
+    pub username: String,
+    pub email: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AuthResponse {
+    pub status: &'static str,
+    pub message: &'static str,
+    pub user: AuthUserResponse,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
     pub service: &'static str,

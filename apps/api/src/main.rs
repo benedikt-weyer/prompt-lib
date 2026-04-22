@@ -1,4 +1,5 @@
 mod config;
+mod database;
 mod entities;
 mod error;
 mod models;
@@ -11,6 +12,7 @@ use tokio::net::TcpListener;
 use tracing::info;
 
 use crate::config::AppConfig;
+use crate::database::ensure_database;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -22,6 +24,9 @@ async fn main() -> anyhow::Result<()> {
     let database = Database::connect(&config.database_url)
         .await
         .context("connect to PostgreSQL")?;
+    ensure_database(&database)
+        .await
+        .context("initialize database schema")?;
 
     let bind_address = config.bind_address();
     let state = AppState::new(config, database);
