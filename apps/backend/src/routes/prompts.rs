@@ -7,12 +7,15 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
     PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
+use std::collections::HashSet;
 
-use crate::entities::{category, prompt, prompt_follow_up, review, user};
+use crate::entities::{
+    category, prompt, prompt_follow_up, prompt_proposed_improvement, review, user,
+};
 use crate::error::ApiError;
 use crate::models::{
     CategoryResponse, CreatePromptRequest, PromptExecutionType, PromptFollowUpResponse,
-    PromptResponse, UpdatePromptRequest, UpdatePromptVisibilityRequest,
+    PromptResponse, PromptSummaryResponse, UpdatePromptRequest, UpdatePromptVisibilityRequest,
 };
 use crate::state::AppState;
 
@@ -74,6 +77,7 @@ async fn create_prompt(
     let name = payload.name.trim().to_string();
     let prompt_body = payload.prompt.trim().to_string();
     let follow_up_prompts = sanitize_follow_up_prompts(payload.follow_up_prompts);
+    let proposed_improvement_prompt_ids = sanitize_proposed_improvement_prompt_ids(payload.proposed_improvement_prompt_ids);
 
     if name.is_empty() || prompt_body.is_empty() {
         return Err(ApiError::Validation(
@@ -91,6 +95,8 @@ async fn create_prompt(
         .one(&state.database)
         .await?
         .ok_or_else(|| ApiError::Validation("category_id must reference an existing category".to_string()))?;
+
+    validate_proposed_improvement_prompts(&state, &proposed_improvement_prompt_ids, None).await?;
 
     let slug = unique_prompt_slug(&state, &name).await?;
 
@@ -118,6 +124,7 @@ async fn create_prompt(
     .await?;
 
     store_prompt_follow_ups(&transaction, created.id, &follow_up_prompts).await?;
+    store_prompt_proposed_improvements(&transaction, created.id, &proposed_improvement_prompt_ids).await?;
     transaction.commit().await?;
 
     Ok((
@@ -161,6 +168,7 @@ async fn update_prompt(
     let name = payload.name.trim().to_string();
     let prompt_body = payload.prompt.trim().to_string();
     let follow_up_prompts = sanitize_follow_up_prompts(payload.follow_up_prompts);
+    let proposed_improvement_prompt_ids = sanitize_proposed_improvement_prompt_ids(payload.proposed_improvement_prompt_ids);
 
     if name.is_empty() || prompt_body.is_empty() {
         return Err(ApiError::Validation(
@@ -187,6 +195,8 @@ async fn update_prompt(
     if record.creator_id != creator_id {
         return Err(ApiError::Unauthorized);
     }
+
+    validate_proposed_improvement_prompts(&state, &proposed_improvement_prompt_ids, Some(record.id)).await?;
 
     let slug = if record.name == name {
         record.slug.clone()
@@ -215,7 +225,12 @@ async fn update_prompt(
         .filter(prompt_follow_up::Column::PromptId.eq(updated.id))
         .exec(&transaction)
         .await?;
+    prompt_proposed_improvement::Entity::delete_many()
+        .filter(prompt_proposed_improvement::Column::PromptId.eq(updated.id))
+        .exec(&transaction)
+        .await?;
     store_prompt_follow_ups(&transaction, updated.id, &follow_up_prompts).await?;
+    store_prompt_proposed_improvements(&transaction, updated.id, &proposed_improvement_prompt_ids).await?;
     transaction.commit().await?;
 
     Ok(Json(build_prompt_response(&state, updated, Some(creator_id)).await?))
@@ -273,6 +288,26 @@ async fn build_prompt_response(
         .order_by_asc(prompt_follow_up::Column::Position)
         .all(&state.database)
         .await?;
+    let proposed_improvement_links = prompt_proposed_improvement::Entity::find()
+        .filter(prompt_proposed_improvement::Column::PromptId.eq(record.id))
+        .order_by_asc(prompt_proposed_improvement::Column::Id)
+        .all(&state.database)
+        .await?;
+    let mut proposed_improvement_prompts = Vec::with_capacity(proposed_improvement_links.len());
+
+    for link in proposed_improvement_links {
+        if let Some(proposed_improvement_prompt) = prompt::Entity::find_by_id(link.proposed_improvement_prompt_id)
+            .filter(visible_prompt_condition(viewer_user_id))
+            .one(&state.database)
+            .await?
+        {
+            proposed_improvement_prompts.push(PromptSummaryResponse {
+                id: proposed_improvement_prompt.id,
+                name: proposed_improvement_prompt.name,
+                slug: proposed_improvement_prompt.slug,
+            });
+        }
+    }
     let author = user::Entity::find_by_id(record.creator_id)
         .one(&state.database)
         .await?
@@ -298,6 +333,7 @@ async fn build_prompt_response(
                 body: follow_up.body,
             })
             .collect(),
+        proposed_improvement_prompts,
         execution_type: PromptExecutionType::from_db(&record.execution_type),
         is_public: record.is_public,
         author_name: author.username,
@@ -407,6 +443,15 @@ fn sanitize_follow_up_prompts(values: Vec<String>) -> Vec<String> {
         .collect()
 }
 
+fn sanitize_proposed_improvement_prompt_ids(values: Vec<i32>) -> Vec<i32> {
+    let mut seen = HashSet::new();
+
+    values
+        .into_iter()
+        .filter(|value| seen.insert(*value))
+        .collect()
+}
+
 async fn store_prompt_follow_ups<C>(
     connection: &C,
     prompt_id: i32,
@@ -424,6 +469,67 @@ where
         }
         .insert(connection)
         .await?;
+    }
+
+    Ok(())
+}
+
+async fn store_prompt_proposed_improvements<C>(
+    connection: &C,
+    prompt_id: i32,
+    proposed_improvement_prompt_ids: &[i32],
+) -> Result<(), ApiError>
+where
+    C: ConnectionTrait,
+{
+    for proposed_improvement_prompt_id in proposed_improvement_prompt_ids {
+        prompt_proposed_improvement::ActiveModel {
+            prompt_id: Set(prompt_id),
+            proposed_improvement_prompt_id: Set(*proposed_improvement_prompt_id),
+            ..Default::default()
+        }
+        .insert(connection)
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn validate_proposed_improvement_prompts(
+    state: &AppState,
+    proposed_improvement_prompt_ids: &[i32],
+    current_prompt_id: Option<i32>,
+) -> Result<(), ApiError> {
+    if proposed_improvement_prompt_ids.is_empty() {
+        return Ok(());
+    }
+
+    for proposed_improvement_prompt_id in proposed_improvement_prompt_ids {
+        if *proposed_improvement_prompt_id <= 0 {
+            return Err(ApiError::Validation(
+                "proposed_improvement_prompt_ids must only contain positive integers".to_string(),
+            ));
+        }
+
+        if current_prompt_id.is_some_and(|current_prompt_id| current_prompt_id == *proposed_improvement_prompt_id) {
+            return Err(ApiError::Validation(
+                "a prompt cannot propose itself as an improvement".to_string(),
+            ));
+        }
+    }
+
+    let existing_prompt_ids = prompt::Entity::find()
+        .filter(prompt::Column::Id.is_in(proposed_improvement_prompt_ids.iter().copied()))
+        .all(&state.database)
+        .await?
+        .into_iter()
+        .map(|prompt| prompt.id)
+        .collect::<HashSet<_>>();
+
+    if existing_prompt_ids.len() != proposed_improvement_prompt_ids.len() {
+        return Err(ApiError::Validation(
+            "proposed_improvement_prompt_ids must reference existing prompts".to_string(),
+        ));
     }
 
     Ok(())

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { type ReactNode, startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl, fetchCategories } from "@/lib/api";
+import { apiUrl, fetchCategories, fetchPrompts } from "@/lib/api";
 import { getPromptExecutionTypeLabel, promptExecutionTypeOptions } from "@/lib/prompt-execution-type";
 import type { CatalogCategory, CatalogPrompt, PromptExecutionType } from "@/lib/types";
 
@@ -53,37 +53,49 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [prompts, setPrompts] = useState<CatalogPrompt[]>([]);
   const [followUpPrompts, setFollowUpPrompts] = useState<string[]>(
     initialPrompt?.follow_up_prompts.map((followUpPrompt) => followUpPrompt.body) ?? [],
   );
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingPrompts, setLoadingPrompts] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isEditMode = initialPrompt !== undefined;
   const submitButtonLabel = getSubmitButtonLabel(isEditMode, pending);
   const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+  const selectedImprovementPromptIds = useMemo(
+    () => new Set(initialPrompt?.proposed_improvement_prompts.map((prompt) => prompt.id) ?? []),
+    [initialPrompt?.proposed_improvement_prompts],
+  );
+  const availableImprovementPrompts = useMemo(
+    () => prompts.filter((prompt) => prompt.id !== initialPrompt?.id),
+    [initialPrompt?.id, prompts],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadCategories() {
+    async function loadPromptMetadata() {
       try {
-        const payload = await fetchCategories();
+        const [loadedCategories, loadedPrompts] = await Promise.all([fetchCategories(), fetchPrompts()]);
         if (!cancelled) {
-          setCategories(payload);
+          setCategories(loadedCategories);
+          setPrompts(loadedPrompts);
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Failed to load categories.");
+          setError(loadError instanceof Error ? loadError.message : "Failed to load prompt metadata.");
         }
       } finally {
         if (!cancelled) {
           setLoadingCategories(false);
+          setLoadingPrompts(false);
         }
       }
     }
 
-    void loadCategories();
+    void loadPromptMetadata();
 
     return () => {
       cancelled = true;
@@ -97,6 +109,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
     const nameValue = formData.get("name");
     const promptValue = formData.get("prompt");
     const categoryValue = formData.get("categoryId");
+    const proposedImprovementPromptValues = formData.getAll("proposedImprovementPromptId");
     const executionTypeValue = formData.get("executionType");
     const followUpPromptValues = formData.getAll("followUpPrompt");
     const visibilityValue = formData.get("visibility");
@@ -104,6 +117,9 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
     const name = typeof nameValue === "string" ? nameValue.trim() : "";
     const prompt = typeof promptValue === "string" ? promptValue.trim() : "";
     const categoryId = typeof categoryValue === "string" ? Number(categoryValue) : Number.NaN;
+    const proposedImprovementPromptIds = proposedImprovementPromptValues
+      .map((value) => (typeof value === "string" ? Number(value) : Number.NaN))
+      .filter((value) => Number.isInteger(value) && value > 0);
     const nextFollowUpPrompts = followUpPromptValues
       .map((value) => (typeof value === "string" ? value.trim() : ""))
       .filter((value) => value.length > 0);
@@ -121,18 +137,19 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
         isEditMode ? `${apiUrl}/api/prompts/${initialPrompt.id}` : `${apiUrl}/api/prompts`,
         {
           method: isEditMode ? "PATCH" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          name,
-          prompt,
-          follow_up_prompts: nextFollowUpPrompts,
-          category_id: categoryId,
-          execution_type: executionType,
-          is_public: isPublic,
-        }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            name,
+            prompt,
+            follow_up_prompts: nextFollowUpPrompts,
+            category_id: categoryId,
+            proposed_improvement_prompt_ids: proposedImprovementPromptIds,
+            execution_type: executionType,
+            is_public: isPublic,
+          }),
         },
       );
 
@@ -169,6 +186,40 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
   function removeFollowUpPrompt(index: number) {
     setFollowUpPrompts((currentFollowUpPrompts) =>
       currentFollowUpPrompts.filter((_, currentIndex) => currentIndex !== index),
+    );
+  }
+
+  let proposedImprovementsField: ReactNode;
+
+  if (loadingPrompts) {
+    proposedImprovementsField = (
+      <p className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
+        Loading available prompts...
+      </p>
+    );
+  } else if (availableImprovementPrompts.length === 0) {
+    proposedImprovementsField = (
+      <p className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
+        No other prompts are available to link yet.
+      </p>
+    );
+  } else {
+    proposedImprovementsField = (
+      <div className="grid gap-3 rounded-2xl border border-border/70 bg-background/60 p-4">
+        {availableImprovementPrompts.map((prompt) => (
+          <label key={prompt.id} className="flex items-start gap-3 text-sm text-foreground">
+            <input
+              type="checkbox"
+              name="proposedImprovementPromptId"
+              value={prompt.id}
+              defaultChecked={selectedImprovementPromptIds.has(prompt.id)}
+              disabled={pending}
+              className="mt-1 h-4 w-4 rounded border-input"
+            />
+            <span>{prompt.name}</span>
+          </label>
+        ))}
+      </div>
     );
   }
 
@@ -238,6 +289,13 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             disabled={pending}
             required
           />
+        </div>
+        <div className="grid gap-2">
+          <Label>Proposed improvements</Label>
+          {proposedImprovementsField}
+          <p className="text-sm text-muted-foreground">
+            Link any prompts that represent proposed improvements over this one.
+          </p>
         </div>
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
@@ -323,7 +381,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             Private prompts are only visible to you. Public prompts appear on the public home page.
           </p>
         </div>
-        <Button type="submit" disabled={pending || authLoading || loadingCategories}>
+        <Button type="submit" disabled={pending || authLoading || loadingCategories || loadingPrompts}>
           {submitButtonLabel}
         </Button>
       </form>

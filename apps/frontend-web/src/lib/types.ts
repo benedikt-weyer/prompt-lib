@@ -66,6 +66,12 @@ export type CatalogPromptFollowUp = {
   body: string;
 };
 
+export type CatalogPromptSummary = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
 export type CatalogPrompt = {
   id: number;
   creator_id: number;
@@ -73,6 +79,7 @@ export type CatalogPrompt = {
   slug: string;
   prompt: string;
   follow_up_prompts: CatalogPromptFollowUp[];
+  proposed_improvement_prompts: CatalogPromptSummary[];
   execution_type: PromptExecutionType;
   is_public: boolean;
   author_name: string;

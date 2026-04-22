@@ -308,6 +308,7 @@ function PromptMainSection({
               Added by {prompt.author_name}. Reviews now persist against an LLM model, an independent framework, and a model-specific thinking effort.
             </p>
           </div>
+          <PromptProposedImprovementsCard prompt={prompt} />
           <Card className="border-border/70 bg-card/90">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
@@ -487,6 +488,29 @@ function PromptCopyButton({ promptText }: Readonly<{ promptText: string }>) {
       </Button>
       {copyError ? <p className="text-sm text-destructive">{copyError}</p> : null}
     </div>
+  );
+}
+
+function PromptProposedImprovementsCard({ prompt }: Readonly<{ prompt: CatalogPrompt }>) {
+  return (
+    <Card className="border-border/70 bg-card/90">
+      <CardHeader>
+        <CardTitle>Proposed improvements</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm text-muted-foreground">
+        {prompt.proposed_improvement_prompts.length === 0 ? (
+          <p>No proposed improvement prompts are linked yet.</p>
+        ) : (
+          prompt.proposed_improvement_prompts.map((proposedImprovementPrompt) => (
+            <div key={proposedImprovementPrompt.id} className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+              <Link href={`/prompts/${proposedImprovementPrompt.slug}`} className="font-medium text-primary">
+                {proposedImprovementPrompt.name}
+              </Link>
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

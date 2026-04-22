@@ -7,6 +7,8 @@ mod m20260422_235500_add_prompt_visibility;
 mod m20260422_235900_decouple_models_from_frameworks;
 mod m20260422_236100_add_prompt_execution_type;
 mod m20260422_236200_add_prompt_follow_ups;
+mod m20260422_236300_add_prompt_proposed_improvement;
+mod m20260422_236400_create_prompt_proposed_improvements;
 
 pub struct Migrator;
 
@@ -27,6 +29,10 @@ impl MigratorTrait for Migrator {
             m20260422_236100_add_prompt_execution_type::Migration,
         ), Box::new(
             m20260422_236200_add_prompt_follow_ups::Migration,
+        ), Box::new(
+            m20260422_236300_add_prompt_proposed_improvement::Migration,
+        ), Box::new(
+            m20260422_236400_create_prompt_proposed_improvements::Migration,
         )]
     }
 }

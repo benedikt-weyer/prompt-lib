@@ -38,6 +38,8 @@ pub enum Relation {
     Reviews,
     #[sea_orm(has_many = "super::prompt_follow_up::Entity")]
     FollowUps,
+    #[sea_orm(has_many = "super::prompt_proposed_improvement::Entity")]
+    ProposedImprovements,
 }
 
 impl Related<super::user::Entity> for Entity {
@@ -55,6 +57,12 @@ impl Related<super::category::Entity> for Entity {
 impl Related<super::prompt_follow_up::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::FollowUps.def()
+    }
+}
+
+impl Related<super::prompt_proposed_improvement::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ProposedImprovements.def()
     }
 }
 

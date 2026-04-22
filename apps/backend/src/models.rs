@@ -123,6 +123,13 @@ pub struct PromptFollowUpResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct PromptSummaryResponse {
+    pub id: i32,
+    pub name: String,
+    pub slug: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct PromptResponse {
     pub id: i32,
     pub creator_id: i32,
@@ -130,6 +137,7 @@ pub struct PromptResponse {
     pub slug: String,
     pub prompt: String,
     pub follow_up_prompts: Vec<PromptFollowUpResponse>,
+    pub proposed_improvement_prompts: Vec<PromptSummaryResponse>,
     pub execution_type: PromptExecutionType,
     pub is_public: bool,
     pub author_name: String,
@@ -222,6 +230,8 @@ pub struct CreatePromptRequest {
     #[serde(default)]
     pub follow_up_prompts: Vec<String>,
     #[serde(default)]
+    pub proposed_improvement_prompt_ids: Vec<i32>,
+    #[serde(default)]
     pub execution_type: PromptExecutionType,
     #[serde(default)]
     pub is_public: bool,
@@ -239,6 +249,8 @@ pub struct UpdatePromptRequest {
     pub prompt: String,
     #[serde(default)]
     pub follow_up_prompts: Vec<String>,
+    #[serde(default)]
+    pub proposed_improvement_prompt_ids: Vec<i32>,
     #[serde(default)]
     pub execution_type: PromptExecutionType,
     pub is_public: bool,
