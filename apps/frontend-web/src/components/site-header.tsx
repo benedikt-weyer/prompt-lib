@@ -90,6 +90,12 @@ export function SiteHeader() {
           >
             Prompts
           </Link>
+          <Link
+            href="/llm-config"
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+          >
+            LLM config
+          </Link>
           {navActions}
         </nav>
       </div>
