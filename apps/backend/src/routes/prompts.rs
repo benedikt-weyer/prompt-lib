@@ -7,12 +7,13 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveM
 
 use crate::entities::{category, prompt, review, user};
 use crate::error::ApiError;
-use crate::models::{CategoryResponse, CreatePromptRequest, PromptResponse, UpdatePromptVisibilityRequest};
+use crate::models::{CategoryResponse, CreatePromptRequest, PromptResponse, UpdatePromptRequest, UpdatePromptVisibilityRequest};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_prompts).post(create_prompt))
+    .route("/{prompt_id}", patch(update_prompt).delete(delete_prompt))
         .route("/{prompt_id}/visibility", patch(update_prompt_visibility))
         .route("/slug/{slug}", get(get_prompt))
         .nest("/{prompt_id}/reviews", super::reviews::router())
@@ -137,6 +138,88 @@ async fn update_prompt_visibility(
     Ok(Json(build_prompt_response(&state, updated, Some(creator_id)).await?))
 }
 
+async fn update_prompt(
+    State(state): State<AppState>,
+    Path(prompt_id): Path<i32>,
+    headers: HeaderMap,
+    Json(payload): Json<UpdatePromptRequest>,
+) -> Result<Json<PromptResponse>, ApiError> {
+    let creator_id = super::auth::current_user_id_from_headers(&state, &headers)?;
+    let name = payload.name.trim().to_string();
+    let prompt_body = payload.prompt.trim().to_string();
+
+    if name.is_empty() || prompt_body.is_empty() {
+        return Err(ApiError::Validation(
+            "prompt name and prompt body are required".to_string(),
+        ));
+    }
+
+    if payload.category_id <= 0 {
+        return Err(ApiError::Validation(
+            "category_id must be a positive integer".to_string(),
+        ));
+    }
+
+    category::Entity::find_by_id(payload.category_id)
+        .one(&state.database)
+        .await?
+        .ok_or_else(|| ApiError::Validation("category_id must reference an existing category".to_string()))?;
+
+    let record = prompt::Entity::find_by_id(prompt_id)
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    if record.creator_id != creator_id {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let slug = if record.name == name {
+        record.slug.clone()
+    } else {
+        unique_prompt_slug_for_update(&state, &name, record.id).await?
+    };
+
+    if slug.is_empty() {
+        return Err(ApiError::Validation(
+            "prompt name must contain letters or numbers".to_string(),
+        ));
+    }
+
+    let mut active_model = record.into_active_model();
+    active_model.category_id = Set(payload.category_id);
+    active_model.name = Set(name);
+    active_model.slug = Set(slug);
+    active_model.prompt = Set(prompt_body);
+    active_model.is_public = Set(payload.is_public);
+    active_model.updated_at = Set(Utc::now());
+    let updated = active_model.update(&state.database).await?;
+
+    Ok(Json(build_prompt_response(&state, updated, Some(creator_id)).await?))
+}
+
+async fn delete_prompt(
+    State(state): State<AppState>,
+    Path(prompt_id): Path<i32>,
+    headers: HeaderMap,
+) -> Result<StatusCode, ApiError> {
+    let creator_id = super::auth::current_user_id_from_headers(&state, &headers)?;
+
+    let record = prompt::Entity::find_by_id(prompt_id)
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    if record.creator_id != creator_id {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let active_model = record.into_active_model();
+    active_model.delete(&state.database).await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn get_prompt(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -222,6 +305,34 @@ async fn unique_prompt_slug(state: &AppState, name: &str) -> Result<String, ApiE
 
     while prompt::Entity::find()
         .filter(prompt::Column::Slug.eq(candidate.clone()))
+        .one(&state.database)
+        .await?
+        .is_some()
+    {
+        candidate = format!("{base}-{counter}");
+        counter += 1;
+    }
+
+    Ok(candidate)
+}
+
+async fn unique_prompt_slug_for_update(
+    state: &AppState,
+    name: &str,
+    prompt_id: i32,
+) -> Result<String, ApiError> {
+    let base = slugify(name);
+
+    if base.is_empty() {
+        return Ok(base);
+    }
+
+    let mut candidate = base.clone();
+    let mut counter = 2;
+
+    while prompt::Entity::find()
+        .filter(prompt::Column::Slug.eq(candidate.clone()))
+        .filter(prompt::Column::Id.ne(prompt_id))
         .one(&state.database)
         .await?
         .is_some()

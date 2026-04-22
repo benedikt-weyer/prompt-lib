@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -255,6 +255,9 @@ function PromptSidebar({
   visibilityPending,
   visibilityError,
   onToggleVisibility,
+  onDeletePrompt,
+  deletePending,
+  deleteError,
   onReviewCreated,
 }: Readonly<{
   prompt: CatalogPrompt | null;
@@ -262,6 +265,9 @@ function PromptSidebar({
   visibilityPending: boolean;
   visibilityError: string | null;
   onToggleVisibility: () => Promise<void>;
+  onDeletePrompt: () => Promise<void>;
+  deletePending: boolean;
+  deleteError: string | null;
   onReviewCreated: (review: CatalogReview) => void;
 }>) {
   const visibilityActionLabel = getVisibilityActionLabel(prompt, visibilityPending);
@@ -291,6 +297,17 @@ function PromptSidebar({
               {visibilityError ? <p className="mt-3 text-sm text-destructive">{visibilityError}</p> : null}
             </div>
           ) : null}
+          {prompt && isOwner ? (
+            <div className="flex flex-wrap gap-3">
+              <Link href={`/prompts/${prompt.slug}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}>
+                Edit prompt
+              </Link>
+              <Button type="button" variant="destructive" size="sm" onClick={onDeletePrompt} disabled={deletePending}>
+                {deletePending ? "Deleting..." : "Delete prompt"}
+              </Button>
+            </div>
+          ) : null}
+          {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
           {prompt ? <CreateReviewForm promptId={prompt.id} onCreated={onReviewCreated} /> : null}
           <div className="flex flex-wrap gap-3">
             <Link href="/frameworks/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}>
@@ -314,6 +331,7 @@ function PromptSidebar({
 
 export default function PromptDetailPage() {
   const params = useParams<{ slug: string }>();
+  const router = useRouter();
   const { user } = useAuth();
   const {
     prompt,
@@ -327,6 +345,41 @@ export default function PromptDetailPage() {
     toggleVisibility,
   } = usePromptDetail(params.slug);
   const isOwner = prompt !== null && user?.id === prompt.creator_id;
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function deletePrompt() {
+    if (prompt === null) {
+      return;
+    }
+
+    if (!globalThis.confirm(`Delete "${prompt.name}"? This also removes its reviews.`)) {
+      return;
+    }
+
+    setDeletePending(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/prompts/${prompt.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setDeleteError(payload?.message ?? "Prompt deletion failed.");
+        return;
+      }
+
+      router.push("/prompts");
+      router.refresh();
+    } catch {
+      setDeleteError("The API could not be reached. Confirm the backend is running and try again.");
+    } finally {
+      setDeletePending(false);
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -339,6 +392,9 @@ export default function PromptDetailPage() {
           visibilityPending={visibilityPending}
           visibilityError={visibilityError}
           onToggleVisibility={toggleVisibility}
+          onDeletePrompt={deletePrompt}
+          deletePending={deletePending}
+          deleteError={deleteError}
           onReviewCreated={handleReviewCreated}
         />
       </main>

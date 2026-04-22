@@ -16,13 +16,27 @@ type CreatePromptResult = CatalogPrompt & {
   message?: string;
 };
 
-export function CreatePromptForm() {
+function getSubmitButtonLabel(isEditMode: boolean, pending: boolean) {
+  if (pending) {
+    return isEditMode ? "Saving changes..." : "Creating prompt...";
+  }
+
+  return isEditMode ? "Save changes" : "Create prompt";
+}
+
+type CreatePromptFormProps = {
+  initialPrompt?: CatalogPrompt;
+};
+
+export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormProps>) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isEditMode = initialPrompt !== undefined;
+  const submitButtonLabel = getSubmitButtonLabel(isEditMode, pending);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,8 +80,10 @@ export function CreatePromptForm() {
     const isPublic = visibilityValue === "public";
 
     try {
-      const response = await fetch(`${apiUrl}/api/prompts`, {
-        method: "POST",
+      const response = await fetch(
+        isEditMode ? `${apiUrl}/api/prompts/${initialPrompt.id}` : `${apiUrl}/api/prompts`,
+        {
+          method: isEditMode ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -78,12 +94,13 @@ export function CreatePromptForm() {
           category_id: categoryId,
           is_public: isPublic,
         }),
-      });
+        },
+      );
 
       const result = (await response.json().catch(() => null)) as CreatePromptResult | null;
 
       if (!response.ok) {
-        setError(result?.message ?? "Prompt creation failed.");
+        setError(result?.message ?? (isEditMode ? "Prompt update failed." : "Prompt creation failed."));
         return;
       }
 
@@ -124,7 +141,14 @@ export function CreatePromptForm() {
       >
         <div className="grid gap-2">
           <Label htmlFor="name">Prompt name</Label>
-          <Input id="name" name="name" placeholder="Architecture Risk Review" disabled={pending} required />
+          <Input
+            id="name"
+            name="name"
+            placeholder="Architecture Risk Review"
+            defaultValue={initialPrompt?.name}
+            disabled={pending}
+            required
+          />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="categoryId">Category</Label>
@@ -134,7 +158,7 @@ export function CreatePromptForm() {
             disabled={pending || loadingCategories}
             required
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue=""
+            defaultValue={initialPrompt ? String(initialPrompt.category.id) : ""}
           >
             <option value="" disabled>
               {loadingCategories ? "Loading categories..." : "Select a category"}
@@ -153,6 +177,7 @@ export function CreatePromptForm() {
             name="prompt"
             className="min-h-48"
             placeholder="Write the prompt exactly as you want to store it."
+            defaultValue={initialPrompt?.prompt}
             disabled={pending}
             required
           />
@@ -164,7 +189,7 @@ export function CreatePromptForm() {
             name="visibility"
             disabled={pending}
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue="private"
+            defaultValue={initialPrompt?.is_public ? "public" : "private"}
           >
             <option value="private">Private</option>
             <option value="public">Public</option>
@@ -174,7 +199,7 @@ export function CreatePromptForm() {
           </p>
         </div>
         <Button type="submit" disabled={pending || authLoading || loadingCategories}>
-          {pending ? "Creating prompt..." : "Create prompt"}
+          {submitButtonLabel}
         </Button>
       </form>
       {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
