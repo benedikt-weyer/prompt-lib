@@ -2,9 +2,8 @@ name: Publish Images
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    tags:
+      - "v*"
 
 permissions:
   contents: read
@@ -40,8 +39,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short
+            type=raw,value=${{ github.ref_name }}
 
       - name: Build and publish web image
         uses: docker/build-push-action@v6
@@ -78,8 +76,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short
+            type=raw,value=${{ github.ref_name }}
 
       - name: Build and publish API image
         uses: docker/build-push-action@v6

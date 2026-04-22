@@ -1,0 +1,81 @@
+name: Create Version Tag
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: create-version-tag-main
+  cancel-in-progress: false
+
+jobs:
+  create-tag:
+    name: Create Semantic Tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --force --tags
+
+      - name: Compute next version tag
+        id: version
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          latest_tag="$(git tag --list 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+
+          if [[ -z "$latest_tag" ]]; then
+            latest_tag="v0.0.0"
+          fi
+
+          version="${latest_tag#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+
+          if [[ "$COMMIT_MESSAGE" =~ ^feat(\([^)]+\))?!: ]]; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+            bump="major"
+          elif [[ "$COMMIT_MESSAGE" =~ ^feat(\([^)]+\))?: ]]; then
+            minor=$((minor + 1))
+            patch=0
+            bump="minor"
+          else
+            patch=$((patch + 1))
+            bump="patch"
+          fi
+
+          next_tag="v${major}.${minor}.${patch}"
+
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          echo "next_tag=$next_tag" >> "$GITHUB_OUTPUT"
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        env:
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+          BUMP: ${{ steps.version.outputs.bump }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if git rev-parse "$NEXT_TAG" >/dev/null 2>&1; then
+            echo "Tag $NEXT_TAG already exists. Skipping."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEXT_TAG" "$COMMIT_SHA" -m "Release $NEXT_TAG ($BUMP bump)"
+          git push origin "$NEXT_TAG"
