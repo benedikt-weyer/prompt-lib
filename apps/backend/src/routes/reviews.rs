@@ -1,17 +1,19 @@
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::routing::get;
+use axum::routing::{get, patch};
 use axum::{Json, Router};
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
 
 use crate::entities::{llm_framework, llm_model, llm_model_thinking_effort, review, user};
 use crate::error::ApiError;
-use crate::models::{CreateReviewRequest, LlmFrameworkSummaryResponse, ReviewResponse};
+use crate::models::{CreateReviewRequest, LlmFrameworkSummaryResponse, ReviewResponse, UpdateReviewRequest};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/", get(list_reviews).post(create_review))
+    Router::new()
+        .route("/", get(list_reviews).post(create_review))
+        .route("/{review_id}", patch(update_review).delete(delete_review))
 }
 
 async fn list_reviews(
@@ -54,58 +56,18 @@ async fn create_review(
         ));
     }
 
-    if !(1..=10).contains(&payload.stars) {
-        return Err(ApiError::Validation(
-            "stars must be between 1 and 10".to_string(),
-        ));
-    }
-
-    if payload.llm_model_id <= 0 {
-        return Err(ApiError::Validation(
-            "llm_model_id must be a positive integer".to_string(),
-        ));
-    }
-
-    if payload.llm_framework_id <= 0 {
-        return Err(ApiError::Validation(
-            "llm_framework_id must be a positive integer".to_string(),
-        ));
-    }
-
-    if payload.llm_model_thinking_effort_id <= 0 {
-        return Err(ApiError::Validation(
-            "llm_model_thinking_effort_id must be a positive integer".to_string(),
-        ));
-    }
-
     let reviewer_id = super::auth::current_user_id_from_headers(&state, &headers)?;
 
     super::prompts::find_visible_prompt_by_id(&state, prompt_id, Some(reviewer_id)).await?;
 
-    let model = llm_model::Entity::find_by_id(payload.llm_model_id)
-        .one(&state.database)
-        .await?
-        .ok_or_else(|| ApiError::Validation("llm_model_id must reference an existing model".to_string()))?;
-
-    llm_framework::Entity::find_by_id(payload.llm_framework_id)
-        .one(&state.database)
-        .await?
-        .ok_or_else(|| ApiError::Validation("llm_framework_id must reference an existing framework".to_string()))?;
-
-    let thinking_effort = llm_model_thinking_effort::Entity::find_by_id(payload.llm_model_thinking_effort_id)
-        .one(&state.database)
-        .await?
-        .ok_or_else(|| {
-            ApiError::Validation(
-                "llm_model_thinking_effort_id must reference an existing thinking effort".to_string(),
-            )
-        })?;
-
-    if thinking_effort.llm_model_id != model.id {
-        return Err(ApiError::Validation(
-            "thinking effort must belong to the selected model".to_string(),
-        ));
-    }
+    validate_review_payload(
+        &state,
+        payload.stars,
+        payload.llm_model_id,
+        payload.llm_framework_id,
+        payload.llm_model_thinking_effort_id,
+    )
+    .await?;
 
     let created = review::ActiveModel {
         prompt_id: Set(prompt_id),
@@ -126,6 +88,140 @@ async fn create_review(
     ))
 }
 
+async fn update_review(
+    State(state): State<AppState>,
+    Path((prompt_id, review_id)): Path<(i32, i32)>,
+    headers: HeaderMap,
+    Json(payload): Json<UpdateReviewRequest>,
+) -> Result<Json<ReviewResponse>, ApiError> {
+    if prompt_id <= 0 || review_id <= 0 {
+        return Err(ApiError::Validation(
+            "prompt_id and review_id must be positive integers".to_string(),
+        ));
+    }
+
+    let reviewer_id = super::auth::current_user_id_from_headers(&state, &headers)?;
+    super::prompts::find_visible_prompt_by_id(&state, prompt_id, Some(reviewer_id)).await?;
+
+    validate_review_payload(
+        &state,
+        payload.stars,
+        payload.llm_model_id,
+        payload.llm_framework_id,
+        payload.llm_model_thinking_effort_id,
+    )
+    .await?;
+
+    let record = find_owned_review(&state, prompt_id, review_id, reviewer_id).await?;
+    let mut active_model = record.into_active_model();
+    active_model.llm_model_id = Set(payload.llm_model_id);
+    active_model.llm_framework_id = Set(payload.llm_framework_id);
+    active_model.llm_model_thinking_effort_id = Set(payload.llm_model_thinking_effort_id);
+    active_model.stars = Set(payload.stars);
+    let updated = active_model.update(&state.database).await?;
+
+    Ok(Json(build_review_response(&state, updated).await?))
+}
+
+async fn delete_review(
+    State(state): State<AppState>,
+    Path((prompt_id, review_id)): Path<(i32, i32)>,
+    headers: HeaderMap,
+) -> Result<StatusCode, ApiError> {
+    if prompt_id <= 0 || review_id <= 0 {
+        return Err(ApiError::Validation(
+            "prompt_id and review_id must be positive integers".to_string(),
+        ));
+    }
+
+    let reviewer_id = super::auth::current_user_id_from_headers(&state, &headers)?;
+    super::prompts::find_visible_prompt_by_id(&state, prompt_id, Some(reviewer_id)).await?;
+
+    let record = find_owned_review(&state, prompt_id, review_id, reviewer_id).await?;
+    let active_model = record.into_active_model();
+    active_model.delete(&state.database).await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn find_owned_review(
+    state: &AppState,
+    prompt_id: i32,
+    review_id: i32,
+    reviewer_id: i32,
+) -> Result<review::Model, ApiError> {
+    let record = review::Entity::find_by_id(review_id)
+        .filter(review::Column::PromptId.eq(prompt_id))
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    if record.reviewer_id != reviewer_id {
+        return Err(ApiError::Unauthorized);
+    }
+
+    Ok(record)
+}
+
+async fn validate_review_payload(
+    state: &AppState,
+    stars: i16,
+    llm_model_id: i32,
+    llm_framework_id: i32,
+    llm_model_thinking_effort_id: i32,
+) -> Result<(), ApiError> {
+    if !(1..=10).contains(&stars) {
+        return Err(ApiError::Validation(
+            "stars must be between 1 and 10".to_string(),
+        ));
+    }
+
+    if llm_model_id <= 0 {
+        return Err(ApiError::Validation(
+            "llm_model_id must be a positive integer".to_string(),
+        ));
+    }
+
+    if llm_framework_id <= 0 {
+        return Err(ApiError::Validation(
+            "llm_framework_id must be a positive integer".to_string(),
+        ));
+    }
+
+    if llm_model_thinking_effort_id <= 0 {
+        return Err(ApiError::Validation(
+            "llm_model_thinking_effort_id must be a positive integer".to_string(),
+        ));
+    }
+
+    let model = llm_model::Entity::find_by_id(llm_model_id)
+        .one(&state.database)
+        .await?
+        .ok_or_else(|| ApiError::Validation("llm_model_id must reference an existing model".to_string()))?;
+
+    llm_framework::Entity::find_by_id(llm_framework_id)
+        .one(&state.database)
+        .await?
+        .ok_or_else(|| ApiError::Validation("llm_framework_id must reference an existing framework".to_string()))?;
+
+    let thinking_effort = llm_model_thinking_effort::Entity::find_by_id(llm_model_thinking_effort_id)
+        .one(&state.database)
+        .await?
+        .ok_or_else(|| {
+            ApiError::Validation(
+                "llm_model_thinking_effort_id must reference an existing thinking effort".to_string(),
+            )
+        })?;
+
+    if thinking_effort.llm_model_id != model.id {
+        return Err(ApiError::Validation(
+            "thinking effort must belong to the selected model".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 pub async fn build_review_response(
     state: &AppState,
     record: review::Model,
@@ -137,6 +233,7 @@ pub async fn build_review_response(
 
     Ok(ReviewResponse {
         id: record.id,
+        reviewer_id: record.reviewer_id,
         stars: record.stars,
         reviewer_name: reviewer.username,
         llm_model: super::llm_models::build_llm_model_summary_response(

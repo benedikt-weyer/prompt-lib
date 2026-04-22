@@ -16,8 +16,14 @@ type CreateReviewResult = CatalogReview & {
 
 type CreateReviewFormProps = {
   promptId: number;
-  onCreated: (review: CatalogReview) => void;
+  onSaved: (review: CatalogReview) => void;
+  initialReview?: CatalogReview;
+  onCancel?: () => void;
 };
+
+function getInitialFieldValue(value: number | undefined) {
+  return value === undefined ? "" : String(value);
+}
 
 function getReviewPrerequisiteMessage(models: CatalogLlmModel[], frameworks: CatalogLlmFramework[]) {
   if (models.length === 0 && frameworks.length === 0) {
@@ -43,7 +49,20 @@ function getReviewPrerequisiteMessage(models: CatalogLlmModel[], frameworks: Cat
   );
 }
 
-export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewFormProps>) {
+function getReviewSubmitLabel(pending: boolean, isEditing: boolean) {
+  if (pending) {
+    return isEditing ? "Saving review..." : "Adding review...";
+  }
+
+  return isEditing ? "Save review" : "Add review";
+}
+
+export function CreateReviewForm({
+  promptId,
+  onSaved,
+  initialReview,
+  onCancel,
+}: Readonly<CreateReviewFormProps>) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [models, setModels] = useState<CatalogLlmModel[]>([]);
@@ -52,7 +71,21 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
   const [loadingFrameworks, setLoadingFrameworks] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string>(getInitialFieldValue(initialReview?.llm_model.id));
+  const [selectedThinkingEffortId, setSelectedThinkingEffortId] = useState<string>(
+    getInitialFieldValue(initialReview?.thinking_effort.id),
+  );
+  const [selectedFrameworkId, setSelectedFrameworkId] = useState<string>(
+    getInitialFieldValue(initialReview?.llm_framework.id),
+  );
+  const [selectedStars, setSelectedStars] = useState<string>(getInitialFieldValue(initialReview?.stars));
+
+  useEffect(() => {
+    setSelectedModelId(getInitialFieldValue(initialReview?.llm_model.id));
+    setSelectedThinkingEffortId(getInitialFieldValue(initialReview?.thinking_effort.id));
+    setSelectedFrameworkId(getInitialFieldValue(initialReview?.llm_framework.id));
+    setSelectedStars(getInitialFieldValue(initialReview?.stars));
+  }, [initialReview]);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +117,26 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
     };
   }, []);
 
+  const selectedModel = models.find((model) => String(model.id) === selectedModelId) ?? null;
+  const availableThinkingEfforts = selectedModel?.thinking_efforts ?? [];
+
+  useEffect(() => {
+    if (selectedModel === null) {
+      if (selectedThinkingEffortId !== "") {
+        setSelectedThinkingEffortId("");
+      }
+      return;
+    }
+
+    const hasSelectedThinkingEffort = availableThinkingEfforts.some(
+      (thinkingEffort) => String(thinkingEffort.id) === selectedThinkingEffortId,
+    );
+
+    if (!hasSelectedThinkingEffort && selectedThinkingEffortId !== "") {
+      setSelectedThinkingEffortId("");
+    }
+  }, [availableThinkingEfforts, selectedModel, selectedThinkingEffortId]);
+
   async function submitReview(formData: FormData) {
     setPending(true);
     setError(null);
@@ -99,29 +152,41 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
     const thinkingEffortId = typeof thinkingEffortValue === "string" ? Number(thinkingEffortValue) : Number.NaN;
 
     try {
-      const response = await fetch(`${apiUrl}/api/prompts/${promptId}/reviews`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        initialReview
+          ? `${apiUrl}/api/prompts/${promptId}/reviews/${initialReview.id}`
+          : `${apiUrl}/api/prompts/${promptId}/reviews`,
+        {
+          method: initialReview ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            stars,
+            llm_model_id: llmModelId,
+            llm_framework_id: llmFrameworkId,
+            llm_model_thinking_effort_id: thinkingEffortId,
+          }),
         },
-        credentials: "include",
-        body: JSON.stringify({
-          stars,
-          llm_model_id: llmModelId,
-          llm_framework_id: llmFrameworkId,
-          llm_model_thinking_effort_id: thinkingEffortId,
-        }),
-      });
+      );
 
       const result = (await response.json().catch(() => null)) as CreateReviewResult | null;
 
       if (!response.ok) {
-        setError(result?.message ?? "Review creation failed.");
+        setError(result?.message ?? (initialReview ? "Review update failed." : "Review creation failed."));
         return;
       }
 
       if (result !== null) {
-        onCreated(result);
+        onSaved(result);
+      }
+
+      if (!initialReview) {
+        setSelectedModelId("");
+        setSelectedThinkingEffortId("");
+        setSelectedFrameworkId("");
+        setSelectedStars("");
       }
 
       startTransition(() => {
@@ -149,9 +214,7 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
       </p>
     );
   }
-
-  const selectedModel = models.find((model) => String(model.id) === selectedModelId) ?? null;
-  const availableThinkingEfforts = selectedModel?.thinking_efforts ?? [];
+  const submitLabel = getReviewSubmitLabel(pending, initialReview !== undefined);
 
   return (
     <>
@@ -192,7 +255,10 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
             disabled={pending || loadingModels || selectedModel === null}
             required
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue=""
+            value={selectedThinkingEffortId}
+            onChange={(event) => {
+              setSelectedThinkingEffortId(event.target.value);
+            }}
           >
             <option value="" disabled>
               {selectedModel === null ? "Select a model first" : "Select a thinking effort"}
@@ -212,7 +278,10 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
             disabled={pending || loadingFrameworks}
             required
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue=""
+            value={selectedFrameworkId}
+            onChange={(event) => {
+              setSelectedFrameworkId(event.target.value);
+            }}
           >
             <option value="" disabled>
               {loadingFrameworks ? "Loading frameworks..." : "Select a framework"}
@@ -232,7 +301,10 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
             disabled={pending}
             required
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue=""
+            value={selectedStars}
+            onChange={(event) => {
+              setSelectedStars(event.target.value);
+            }}
           >
             <option value="" disabled>
               Select a score
@@ -244,9 +316,16 @@ export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewF
             ))}
           </select>
         </div>
-        <Button type="submit" disabled={pending || authLoading || loadingModels || loadingFrameworks}>
-          {pending ? "Adding review..." : "Add review"}
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" disabled={pending || authLoading || loadingModels || loadingFrameworks}>
+            {submitLabel}
+          </Button>
+          {initialReview && onCancel ? (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+              Cancel
+            </Button>
+          ) : null}
+        </div>
       </form>
       {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
     </>

@@ -49,6 +49,7 @@ export type CatalogLlmModel = {
 
 export type CatalogReview = {
   id: number;
+  reviewer_id: number;
   stars: number;
   reviewer_name: string;
   llm_model: CatalogLlmModelSummary;

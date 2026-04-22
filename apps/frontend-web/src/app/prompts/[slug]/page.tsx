@@ -27,19 +27,25 @@ async function loadPromptData(slug: string) {
   return { prompt, reviews };
 }
 
-function applyReviewToPrompt(currentPrompt: CatalogPrompt | null, review: CatalogReview) {
+function applyReviewsToPrompt(currentPrompt: CatalogPrompt | null, reviews: CatalogReview[]) {
   if (currentPrompt === null) {
     return currentPrompt;
   }
 
-  const nextReviewCount = currentPrompt.review_count + 1;
-  const currentAverage = currentPrompt.average_stars ?? 0;
-  const totalStars = currentAverage * currentPrompt.review_count + review.stars;
+  if (reviews.length === 0) {
+    return {
+      ...currentPrompt,
+      review_count: 0,
+      average_stars: null,
+    };
+  }
+
+  const totalStars = reviews.reduce((sum, review) => sum + review.stars, 0);
 
   return {
     ...currentPrompt,
-    review_count: nextReviewCount,
-    average_stars: Number((totalStars / nextReviewCount).toFixed(1)),
+    review_count: reviews.length,
+    average_stars: Number((totalStars / reviews.length).toFixed(1)),
   };
 }
 
@@ -140,8 +146,29 @@ function usePromptDetail(slug: string) {
   }, [slug]);
 
   function handleReviewCreated(review: CatalogReview) {
-    setReviews((currentReviews) => [review, ...currentReviews]);
-    setPrompt((currentPrompt) => applyReviewToPrompt(currentPrompt, review));
+    setReviews((currentReviews) => {
+      const nextReviews = [review, ...currentReviews];
+      setPrompt((currentPrompt) => applyReviewsToPrompt(currentPrompt, nextReviews));
+      return nextReviews;
+    });
+  }
+
+  function handleReviewUpdated(review: CatalogReview) {
+    setReviews((currentReviews) => {
+      const nextReviews = currentReviews.map((currentReview) =>
+        currentReview.id === review.id ? review : currentReview,
+      );
+      setPrompt((currentPrompt) => applyReviewsToPrompt(currentPrompt, nextReviews));
+      return nextReviews;
+    });
+  }
+
+  function handleReviewDeleted(reviewId: number) {
+    setReviews((currentReviews) => {
+      const nextReviews = currentReviews.filter((review) => review.id !== reviewId);
+      setPrompt((currentPrompt) => applyReviewsToPrompt(currentPrompt, nextReviews));
+      return nextReviews;
+    });
   }
 
   async function toggleVisibility() {
@@ -177,6 +204,8 @@ function usePromptDetail(slug: string) {
     visibilityPending,
     visibilityError,
     handleReviewCreated,
+    handleReviewUpdated,
+    handleReviewDeleted,
     toggleVisibility,
   };
 }
@@ -187,14 +216,59 @@ function PromptMainSection({
   isMissing,
   prompt,
   reviews,
+  currentUserId,
+  onReviewUpdated,
+  onReviewDeleted,
 }: Readonly<{
   loading: boolean;
   error: string | null;
   isMissing: boolean;
   prompt: CatalogPrompt | null;
   reviews: CatalogReview[];
+  currentUserId: number | null;
+  onReviewUpdated: (review: CatalogReview) => void;
+  onReviewDeleted: (reviewId: number) => void;
 }>) {
   const hasReviews = reviews.length > 0;
+  const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
+  const [deletePendingId, setDeletePendingId] = useState<number | null>(null);
+  const [reviewActionError, setReviewActionError] = useState<string | null>(null);
+
+  async function deleteReview(review: CatalogReview) {
+    if (prompt === null) {
+      return;
+    }
+
+    if (!globalThis.confirm(`Delete your review for "${prompt.name}"?`)) {
+      return;
+    }
+
+    setDeletePendingId(review.id);
+    setReviewActionError(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/prompts/${prompt.id}/reviews/${review.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        setReviewActionError(payload?.message ?? "Review deletion failed.");
+        return;
+      }
+
+      onReviewDeleted(review.id);
+
+      if (editingReviewId === review.id) {
+        setEditingReviewId(null);
+      }
+    } catch {
+      setReviewActionError("The API could not be reached. Confirm the backend is running and try again.");
+    } finally {
+      setDeletePendingId(null);
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -245,6 +319,7 @@ function PromptMainSection({
               <CardTitle>Review runs</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {reviewActionError ? <p className="text-sm text-destructive">{reviewActionError}</p> : null}
               {hasReviews ? (
                 <div className="space-y-3">
                   {reviews.map((review) => (
@@ -258,6 +333,54 @@ function PromptMainSection({
                       <p className="mt-3 text-sm text-muted-foreground">
                         Reviewed by {review.reviewer_name} on {new Date(review.created_at).toLocaleDateString()}.
                       </p>
+                      {currentUserId === review.reviewer_id ? (
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setReviewActionError(null);
+                              setEditingReviewId((currentEditingReviewId) =>
+                                currentEditingReviewId === review.id ? null : review.id,
+                              );
+                            }}
+                          >
+                            {editingReviewId === review.id ? "Close editor" : "Edit review"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={async () => {
+                              await deleteReview(review);
+                            }}
+                            disabled={deletePendingId === review.id}
+                          >
+                            {deletePendingId === review.id ? "Deleting..." : "Delete review"}
+                          </Button>
+                        </div>
+                      ) : null}
+                      {editingReviewId === review.id && prompt !== null ? (
+                        <Card className="mt-4 border-border/70 bg-background/80" size="sm">
+                          <CardHeader>
+                            <CardTitle>Edit your review</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <CreateReviewForm
+                              promptId={prompt.id}
+                              initialReview={review}
+                              onSaved={(updatedReview) => {
+                                onReviewUpdated(updatedReview);
+                                setEditingReviewId(null);
+                              }}
+                              onCancel={() => {
+                                setEditingReviewId(null);
+                              }}
+                            />
+                          </CardContent>
+                        </Card>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -389,7 +512,7 @@ function PromptSidebar({
             </div>
           ) : null}
           {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
-          {prompt ? <CreateReviewForm promptId={prompt.id} onCreated={onReviewCreated} /> : null}
+          {prompt ? <CreateReviewForm promptId={prompt.id} onSaved={onReviewCreated} /> : null}
           <div className="flex flex-wrap gap-3">
             <Link href="/frameworks/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}>
               Create framework
@@ -423,6 +546,8 @@ export default function PromptDetailPage() {
     visibilityPending,
     visibilityError,
     handleReviewCreated,
+    handleReviewUpdated,
+    handleReviewDeleted,
     toggleVisibility,
   } = usePromptDetail(params.slug);
   const isOwner = prompt !== null && user?.id === prompt.creator_id;
@@ -466,7 +591,16 @@ export default function PromptDetailPage() {
     <div className="min-h-screen">
       <SiteHeader />
       <main className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-16">
-        <PromptMainSection loading={loading} error={error} isMissing={isMissing} prompt={prompt} reviews={reviews} />
+        <PromptMainSection
+          loading={loading}
+          error={error}
+          isMissing={isMissing}
+          prompt={prompt}
+          reviews={reviews}
+          currentUserId={user?.id ?? null}
+          onReviewUpdated={handleReviewUpdated}
+          onReviewDeleted={handleReviewDeleted}
+        />
         <PromptSidebar
           prompt={prompt}
           isOwner={isOwner}

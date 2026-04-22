@@ -74,6 +74,7 @@ pub struct LlmModelResponse {
 #[derive(Debug, Clone, Serialize)]
 pub struct ReviewResponse {
     pub id: i32,
+    pub reviewer_id: i32,
     pub stars: i16,
     pub reviewer_name: String,
     pub llm_model: LlmModelSummaryResponse,
@@ -195,6 +196,14 @@ pub struct UpdatePromptRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateReviewRequest {
+    pub stars: i16,
+    pub llm_model_id: i32,
+    pub llm_framework_id: i32,
+    pub llm_model_thinking_effort_id: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateReviewRequest {
     pub stars: i16,
     pub llm_model_id: i32,
     pub llm_framework_id: i32,
