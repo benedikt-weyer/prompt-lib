@@ -8,6 +8,7 @@ pub struct Model {
     pub creator_id: i32,
     pub category_id: i32,
     pub name: String,
+    pub slug: String,
     pub prompt: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,

@@ -241,6 +241,13 @@ fn build_logout_cookie() -> Result<HeaderValue, ApiError> {
     .map_err(|_| ApiError::Internal)
 }
 
+pub(crate) fn current_user_id_from_headers(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<i32, ApiError> {
+    authenticate_request(state, headers).map(|claims| claims.sub)
+}
+
 fn authenticate_request(state: &AppState, headers: &HeaderMap) -> Result<AuthClaims, ApiError> {
     let token = extract_auth_cookie(headers).ok_or(ApiError::Unauthorized)?;
 

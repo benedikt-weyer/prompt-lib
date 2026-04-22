@@ -1,26 +1,43 @@
-use axum::extract::Path;
+use axum::extract::{Path, State};
+use axum::http::{HeaderMap, StatusCode};
 use axum::routing::get;
 use axum::{Json, Router};
+use chrono::Utc;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 
+use crate::entities::{category, prompt, user};
 use crate::error::ApiError;
-use crate::models::{CreatePromptRequest, FeatureStatusResponse};
+use crate::models::{CategoryResponse, CreatePromptRequest, PromptResponse};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_prompts).post(create_prompt))
-        .route("/{prompt_id}", get(get_prompt))
+        .route("/slug/{slug}", get(get_prompt))
         .nest("/{prompt_id}/reviews", super::reviews::router())
 }
 
-async fn list_prompts() -> Json<Vec<serde_json::Value>> {
-    Json(vec![])
+async fn list_prompts(State(state): State<AppState>) -> Result<Json<Vec<PromptResponse>>, ApiError> {
+    let records = prompt::Entity::find().all(&state.database).await?;
+    let mut response = Vec::with_capacity(records.len());
+
+    for record in records {
+        response.push(build_prompt_response(&state, record).await?);
+    }
+
+    Ok(Json(response))
 }
 
 async fn create_prompt(
+    State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<CreatePromptRequest>,
-) -> Result<Json<FeatureStatusResponse>, ApiError> {
-    if payload.name.trim().is_empty() || payload.prompt.trim().is_empty() {
+) -> Result<(StatusCode, Json<PromptResponse>), ApiError> {
+    let creator_id = super::auth::current_user_id_from_headers(&state, &headers)?;
+    let name = payload.name.trim().to_string();
+    let prompt_body = payload.prompt.trim().to_string();
+
+    if name.is_empty() || prompt_body.is_empty() {
         return Err(ApiError::Validation(
             "prompt name and prompt body are required".to_string(),
         ));
@@ -32,19 +49,145 @@ async fn create_prompt(
         ));
     }
 
-    Err(ApiError::NotImplemented(
-        "prompt persistence is the next backend milestone",
-    ))
-}
+    let category_record = category::Entity::find_by_id(payload.category_id)
+        .one(&state.database)
+        .await?
+        .ok_or_else(|| ApiError::Validation("category_id must reference an existing category".to_string()))?;
 
-async fn get_prompt(Path(prompt_id): Path<i32>) -> Result<Json<serde_json::Value>, ApiError> {
-    if prompt_id <= 0 {
+    let slug = unique_prompt_slug(&state, &name).await?;
+
+    if slug.is_empty() {
         return Err(ApiError::Validation(
-            "prompt_id must be a positive integer".to_string(),
+            "prompt name must contain letters or numbers".to_string(),
         ));
     }
 
-    Err(ApiError::NotImplemented(
-        "prompt detail loading is the next backend milestone",
+    let created = prompt::ActiveModel {
+        creator_id: Set(creator_id),
+        category_id: Set(payload.category_id),
+        name: Set(name),
+        slug: Set(slug),
+        prompt: Set(prompt_body),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    }
+    .insert(&state.database)
+    .await?;
+
+    let author = user::Entity::find_by_id(creator_id)
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(PromptResponse {
+            id: created.id,
+            name: created.name,
+            slug: created.slug,
+            prompt: created.prompt,
+            author_name: author.username,
+            category: CategoryResponse {
+                id: category_record.id,
+                name: category_record.name,
+                slug: category_record.slug,
+                description: category_record.description,
+                prompt_count: prompt::Entity::find()
+                    .filter(prompt::Column::CategoryId.eq(category_record.id))
+                    .count(&state.database)
+                    .await?,
+            },
+            review_count: 0,
+            average_stars: None,
+        }),
     ))
+}
+
+async fn get_prompt(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+) -> Result<Json<PromptResponse>, ApiError> {
+    let record = prompt::Entity::find()
+        .filter(prompt::Column::Slug.eq(slug))
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    Ok(Json(build_prompt_response(&state, record).await?))
+}
+
+async fn build_prompt_response(
+    state: &AppState,
+    record: prompt::Model,
+) -> Result<PromptResponse, ApiError> {
+    let category_record = category::Entity::find_by_id(record.category_id)
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let author = user::Entity::find_by_id(record.creator_id)
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let prompt_count = prompt::Entity::find()
+        .filter(prompt::Column::CategoryId.eq(category_record.id))
+        .count(&state.database)
+        .await?;
+
+    Ok(PromptResponse {
+        id: record.id,
+        name: record.name,
+        slug: record.slug,
+        prompt: record.prompt,
+        author_name: author.username,
+        category: CategoryResponse {
+            id: category_record.id,
+            name: category_record.name,
+            slug: category_record.slug,
+            description: category_record.description,
+            prompt_count,
+        },
+        review_count: 0,
+        average_stars: None,
+    })
+}
+
+async fn unique_prompt_slug(state: &AppState, name: &str) -> Result<String, ApiError> {
+    let base = slugify(name);
+
+    if base.is_empty() {
+        return Ok(base);
+    }
+
+    let mut candidate = base.clone();
+    let mut counter = 2;
+
+    while prompt::Entity::find()
+        .filter(prompt::Column::Slug.eq(candidate.clone()))
+        .one(&state.database)
+        .await?
+        .is_some()
+    {
+        candidate = format!("{base}-{counter}");
+        counter += 1;
+    }
+
+    Ok(candidate)
+}
+
+fn slugify(input: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_dash = false;
+
+    for character in input.chars().flat_map(|character| character.to_lowercase()) {
+        if character.is_ascii_alphanumeric() {
+            slug.push(character);
+            previous_dash = false;
+        } else if !previous_dash {
+            slug.push('-');
+            previous_dash = true;
+        }
+    }
+
+    slug.trim_matches('-').to_string()
 }

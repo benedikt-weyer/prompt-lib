@@ -6,6 +6,25 @@ export type AuthUser = {
   email: string;
 };
 
+export type CatalogCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  prompt_count: number;
+};
+
+export type CatalogPrompt = {
+  id: number;
+  name: string;
+  slug: string;
+  prompt: string;
+  author_name: string;
+  category: CatalogCategory;
+  review_count: number;
+  average_stars: number | null;
+};
+
 export type Category = {
   id: string;
   name: string;

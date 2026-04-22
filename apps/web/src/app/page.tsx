@@ -36,8 +36,11 @@ export default function Home() {
                   <Link href="/prompts" className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6")}>
                     Open prompt library
                   </Link>
-                  <Link href="/register" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full px-6")}>
-                    Add another user
+                  <Link href="/categories/new" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full px-6")}>
+                    Create category
+                  </Link>
+                  <Link href="/prompts/new" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full px-6")}>
+                    Create prompt
                   </Link>
                 </div>
               </CardContent>

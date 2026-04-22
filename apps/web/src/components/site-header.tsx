@@ -17,6 +17,56 @@ export function SiteHeader() {
     router.refresh();
   }
 
+  let navActions: React.ReactNode;
+
+  if (loading) {
+    navActions = <span className="px-3 text-sm text-muted-foreground">Checking session...</span>;
+  } else if (user) {
+    navActions = (
+      <>
+        <Link
+          href="/categories/new"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+        >
+          New category
+        </Link>
+        <Link
+          href="/prompts/new"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+        >
+          New prompt
+        </Link>
+        <span className="px-3 text-sm text-muted-foreground">Hi, {user.username}</span>
+        <button
+          type="button"
+          onClick={() => {
+            void handleLogout();
+          }}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}
+        >
+          Logout
+        </button>
+      </>
+    );
+  } else {
+    navActions = (
+      <>
+        <Link
+          href="/login"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+        >
+          Login
+        </Link>
+        <Link
+          href="/register"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+        >
+          Register
+        </Link>
+      </>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4 lg:px-8">
@@ -40,37 +90,7 @@ export function SiteHeader() {
           >
             Prompts
           </Link>
-          {loading ? (
-            <span className="px-3 text-sm text-muted-foreground">Checking session...</span>
-          ) : user ? (
-            <>
-              <span className="px-3 text-sm text-muted-foreground">Hi, {user.username}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleLogout();
-                }}
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
-              >
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
-              >
-                Register
-              </Link>
-            </>
-          )}
+          {navActions}
         </nav>
       </div>
     </header>

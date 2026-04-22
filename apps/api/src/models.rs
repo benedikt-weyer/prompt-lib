@@ -28,6 +28,27 @@ pub struct SessionResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct CategoryResponse {
+    pub id: i32,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub prompt_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PromptResponse {
+    pub id: i32,
+    pub name: String,
+    pub slug: String,
+    pub prompt: String,
+    pub author_name: String,
+    pub category: CategoryResponse,
+    pub review_count: u64,
+    pub average_stars: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
     pub service: &'static str,
