@@ -1,5 +1,11 @@
 export type ThinkingEffort = "low" | "medium" | "high";
 
+export type AuthUser = {
+  id: number;
+  username: string;
+  email: string;
+};
+
 export type Category = {
   id: string;
   name: string;

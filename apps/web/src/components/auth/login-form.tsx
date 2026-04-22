@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -10,56 +9,48 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { AuthUser } from "@/lib/types";
 
-type RegisterResult = {
+type LoginResult = {
   message?: string;
   user?: AuthUser;
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-export function RegisterForm() {
+export function LoginForm() {
   const router = useRouter();
   const { setAuthenticatedUser } = useAuth();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  async function submitRegistration(formData: FormData) {
+  async function submitLogin(formData: FormData) {
     setPending(true);
     setError(null);
-    setSuccess(null);
 
-    const usernameValue = formData.get("username");
     const emailValue = formData.get("email");
     const passwordValue = formData.get("password");
 
-    const username = typeof usernameValue === "string" ? usernameValue.trim() : "";
     const email = typeof emailValue === "string" ? emailValue.trim() : "";
     const password = typeof passwordValue === "string" ? passwordValue : "";
 
     try {
-      const response = await fetch(`${apiUrl}/api/auth/register`, {
+      const response = await fetch(`${apiUrl}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-        }),
+        body: JSON.stringify({ email, password }),
       });
 
-      const result = (await response.json().catch(() => null)) as RegisterResult | null;
+      const result = (await response.json().catch(() => null)) as LoginResult | null;
 
       if (!response.ok) {
-        setError(result?.message ?? "Registration failed.");
+        setError(result?.message ?? "Login failed.");
         return;
       }
 
       setAuthenticatedUser(result?.user ?? null);
-      setSuccess(result?.message ?? "Registration successful.");
+
       startTransition(() => {
         router.push("/");
         router.refresh();
@@ -76,38 +67,22 @@ export function RegisterForm() {
       <form
         className="grid gap-4"
         action={async (formData) => {
-          await submitRegistration(formData);
+          await submitLogin(formData);
         }}
       >
-        <div className="grid gap-2">
-          <Label htmlFor="username">Username</Label>
-          <Input id="username" name="username" placeholder="prompt-curator" disabled={pending} required />
-        </div>
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" placeholder="you@company.com" disabled={pending} required />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            placeholder="Minimum 8 characters"
-            minLength={8}
-            disabled={pending}
-            required
-          />
+          <Input id="password" name="password" type="password" placeholder="••••••••" disabled={pending} required />
         </div>
         <Button type="submit" disabled={pending}>
-          {pending ? "Creating account..." : "Create account"}
+          {pending ? "Signing in..." : "Sign in"}
         </Button>
       </form>
       {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
-      {success ? <p className="mt-4 text-sm text-primary">{success}</p> : null}
-      <p className="mt-4 text-sm text-muted-foreground">
-        Already registered? <Link href="/login" className="font-medium text-primary">Sign in</Link>.
-      </p>
     </>
   );
 }

@@ -21,6 +21,13 @@ pub struct AuthResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct SessionResponse {
+    pub status: &'static str,
+    pub authenticated: bool,
+    pub user: Option<AuthUserResponse>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
     pub service: &'static str,

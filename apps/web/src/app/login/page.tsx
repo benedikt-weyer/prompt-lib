@@ -1,10 +1,8 @@
 import Link from "next/link";
 
+import { LoginForm } from "@/components/auth/login-form";
 import { SiteHeader } from "@/components/site-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   return (
@@ -16,7 +14,7 @@ export default function LoginPage() {
             <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Login</p>
             <h1 className="text-4xl font-semibold tracking-tight">Sign in to manage prompt runs and review history.</h1>
             <p className="max-w-xl text-sm leading-7 text-muted-foreground">
-              JWT session handling is the next backend milestone. This page already reflects the intended browser flow and field set.
+              Sign in uses the same JWT cookie flow as registration, so successful login immediately restores an authenticated browser session.
             </p>
           </div>
           <Card className="border-border/70 bg-card/95">
@@ -24,17 +22,7 @@ export default function LoginPage() {
               <CardTitle>Welcome back</CardTitle>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="you@company.com" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" placeholder="••••••••" />
-                </div>
-                <Button type="submit">JWT login wiring next</Button>
-              </form>
+              <LoginForm />
               <p className="mt-4 text-sm text-muted-foreground">
                 Need an account? <Link href="/register" className="font-medium text-primary">Register here</Link>.
               </p>

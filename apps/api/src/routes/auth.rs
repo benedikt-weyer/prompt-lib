@@ -1,31 +1,72 @@
 use argon2::password_hash::rand_core::OsRng;
-use argon2::password_hash::{PasswordHasher, SaltString};
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
 use axum::extract::State;
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{Duration, Utc};
-use jsonwebtoken::{EncodingKey, Header};
+use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, Set};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::entities::user;
 use crate::error::ApiError;
 use crate::models::{
     AuthResponse,
     AuthUserResponse,
-    FeatureStatusResponse,
     LoginRequest,
     RegisterRequest,
+    SessionResponse,
 };
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/me", get(me))
+        .route("/logout", post(logout))
         .route("/register", post(register))
         .route("/login", post(login))
+}
+
+pub async fn me(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<SessionResponse>, ApiError> {
+    let claims = authenticate_request(&state, &headers)?;
+    let user = user::Entity::find_by_id(claims.sub)
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+
+    Ok(Json(SessionResponse {
+        status: "ok",
+        authenticated: true,
+        user: Some(AuthUserResponse {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+        }),
+    }))
+}
+
+pub async fn logout() -> Result<Response, ApiError> {
+    let mut response = (
+        StatusCode::OK,
+        Json(SessionResponse {
+            status: "ok",
+            authenticated: false,
+            user: None,
+        }),
+    )
+        .into_response();
+
+    response
+        .headers_mut()
+        .append(header::SET_COOKIE, build_logout_cookie()?);
+
+    Ok(response)
 }
 
 pub async fn register(
@@ -101,21 +142,48 @@ pub async fn register(
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
-) -> Result<Json<FeatureStatusResponse>, ApiError> {
-    if payload.email.trim().is_empty() || payload.password.is_empty() {
+) -> Result<Response, ApiError> {
+    let email = payload.email.trim().to_lowercase();
+
+    if email.is_empty() || payload.password.is_empty() {
         return Err(ApiError::Validation(
             "email and password are required".to_string(),
         ));
     }
 
-    let _jwt_secret = &state.config.jwt_secret;
+    let user = user::Entity::find()
+        .filter(user::Column::Email.eq(email))
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
 
-    Err(ApiError::NotImplemented(
-        "credential verification and cookie-based JWT sessions are the next backend milestone",
-    ))
+    verify_password(&payload.password, &user.password_hash)?;
+
+    let token = issue_jwt(&state, &user)?;
+    let auth_cookie = build_auth_cookie(&token)?;
+
+    let mut response = (
+        StatusCode::OK,
+        Json(AuthResponse {
+            status: "ok",
+            message: "login successful",
+            user: AuthUserResponse {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+            },
+        }),
+    )
+        .into_response();
+
+    response
+        .headers_mut()
+        .append(header::SET_COOKIE, auth_cookie);
+
+    Ok(response)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AuthClaims {
     sub: i32,
     username: String,
@@ -132,6 +200,14 @@ fn hash_password(password: &str) -> Result<String, ApiError> {
         .map(|value| value.to_string())
         .map_err(|_| ApiError::Internal)
 }
+
+    fn verify_password(password: &str, password_hash: &str) -> Result<(), ApiError> {
+        let parsed_hash = PasswordHash::new(password_hash).map_err(|_| ApiError::Internal)?;
+
+        Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .map_err(|_| ApiError::Unauthorized)
+    }
 
 fn issue_jwt(state: &AppState, user: &user::Model) -> Result<String, ApiError> {
     let issued_at = Utc::now();
@@ -156,4 +232,37 @@ fn build_auth_cookie(token: &str) -> Result<HeaderValue, ApiError> {
         "prompt_lib_token={token}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax"
     ))
     .map_err(|_| ApiError::Internal)
+}
+
+fn build_logout_cookie() -> Result<HeaderValue, ApiError> {
+    HeaderValue::from_str(
+        "prompt_lib_token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax",
+    )
+    .map_err(|_| ApiError::Internal)
+}
+
+fn authenticate_request(state: &AppState, headers: &HeaderMap) -> Result<AuthClaims, ApiError> {
+    let token = extract_auth_cookie(headers).ok_or(ApiError::Unauthorized)?;
+
+    decode::<AuthClaims>(
+        &token,
+        &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map(|data| data.claims)
+    .map_err(|_| ApiError::Unauthorized)
+}
+
+fn extract_auth_cookie(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(header::COOKIE)
+        .and_then(|cookie| cookie.to_str().ok())
+        .and_then(|cookie| {
+            cookie.split(';').find_map(|part| {
+                let trimmed = part.trim();
+                trimmed
+                    .strip_prefix("prompt_lib_token=")
+                    .map(ToString::to_string)
+            })
+        })
 }

@@ -1,15 +1,22 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { useAuth } from "@/components/auth/auth-provider";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { href: "/prompts", label: "Prompts" },
-  { href: "/login", label: "Login" },
-  { href: "/register", label: "Register" },
-];
-
 export function SiteHeader() {
+  const router = useRouter();
+  const { user, loading, logout } = useAuth();
+
+  async function handleLogout() {
+    await logout();
+    router.push("/");
+    router.refresh();
+  }
+
   return (
     <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4 lg:px-8">
@@ -27,15 +34,43 @@ export function SiteHeader() {
           </div>
         </Link>
         <nav className="flex items-center gap-2">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
-            >
-              {link.label}
-            </Link>
-          ))}
+          <Link
+            href="/prompts"
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+          >
+            Prompts
+          </Link>
+          {loading ? (
+            <span className="px-3 text-sm text-muted-foreground">Checking session...</span>
+          ) : user ? (
+            <>
+              <span className="px-3 text-sm text-muted-foreground">Hi, {user.username}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleLogout();
+                }}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+              >
+                Login
+              </Link>
+              <Link
+                href="/register"
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+              >
+                Register
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>

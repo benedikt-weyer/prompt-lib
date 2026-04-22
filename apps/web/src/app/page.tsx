@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -8,7 +11,66 @@ import { averageStars, categories, prompts } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
+  const { user, loading } = useAuth();
   const totalReviews = prompts.reduce((count, prompt) => count + prompt.reviews.length, 0);
+
+  if (!loading && user) {
+    return (
+      <div className="min-h-screen">
+        <SiteHeader />
+        <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10 lg:px-8 lg:py-16">
+          <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <Card className="border-border/70 bg-card/95 shadow-[0_30px_120px_-70px_var(--primary)]">
+              <CardHeader className="gap-3">
+                <Badge className="w-fit rounded-full bg-secondary px-4 py-1 text-secondary-foreground">
+                  Dashboard
+                </Badge>
+                <CardTitle className="text-4xl">Welcome back, {user.username}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
+                <p>
+                  Your browser session is active. From here you can browse prompts, review model runs,
+                  and start adding real categories and prompts once the remaining CRUD endpoints are wired.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/prompts" className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6")}>
+                    Open prompt library
+                  </Link>
+                  <Link href="/register" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full px-6")}>
+                    Add another user
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 bg-card/95">
+              <CardHeader>
+                <CardTitle className="text-xl">Session summary</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+                <Metric label="Signed In As" value={user.username} />
+                <Metric label="Catalog Prompts" value={String(prompts.length)} />
+                <Metric label="Review Runs" value={String(totalReviews)} />
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="grid gap-5 md:grid-cols-3">
+            {categories.map((category) => (
+              <Card key={category.id} className="border-border/70 bg-card/90">
+                <CardHeader className="gap-2">
+                  <Badge variant="secondary" className="w-fit rounded-full">{category.promptCount} prompts</Badge>
+                  <CardTitle>{category.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm leading-7 text-muted-foreground">
+                  {category.description}
+                </CardContent>
+              </Card>
+            ))}
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
