@@ -2,29 +2,104 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
-
+  --background: oklch(0.98 0.01 84.22);
+  --foreground: oklch(0.22 0.03 42.1);
+  --card: oklch(0.99 0.01 84.22);
+  --card-foreground: oklch(0.22 0.03 42.1);
+  --popover: oklch(0.99 0.01 84.22);
+  --popover-foreground: oklch(0.22 0.03 42.1);
+  --primary: oklch(0.63 0.21 34.5);
+  --primary-foreground: oklch(0.98 0.01 84.22);
+  --secondary: oklch(0.92 0.05 81.24);
+  --secondary-foreground: oklch(0.29 0.03 42.1);
+  --muted: oklch(0.94 0.02 78.16);
+  --muted-foreground: oklch(0.49 0.04 44.2);
+  --accent: oklch(0.86 0.1 69.66);
+  --accent-foreground: oklch(0.24 0.03 42.1);
+  --destructive: oklch(0.61 0.22 26.54);
+  --border: oklch(0.86 0.03 76.9);
+  --input: oklch(0.86 0.03 76.9);
+  --ring: oklch(0.63 0.21 34.5);
+  --radius: 1.1rem;
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 0.35rem);
+  --radius-md: calc(var(--radius) - 0.15rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.35rem);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-ibm-plex-mono);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
+    --background: oklch(0.18 0.02 39.2);
+    --foreground: oklch(0.94 0.01 84.22);
+    --card: oklch(0.22 0.02 40.8);
+    --card-foreground: oklch(0.94 0.01 84.22);
+    --popover: oklch(0.22 0.02 40.8);
+    --popover-foreground: oklch(0.94 0.01 84.22);
+    --primary: oklch(0.7 0.17 36.2);
+    --primary-foreground: oklch(0.18 0.02 39.2);
+    --secondary: oklch(0.31 0.03 40.8);
+    --secondary-foreground: oklch(0.94 0.01 84.22);
+    --muted: oklch(0.27 0.02 40.8);
+    --muted-foreground: oklch(0.75 0.03 76.2);
+    --accent: oklch(0.35 0.06 63.1);
+    --accent-foreground: oklch(0.96 0.01 84.22);
+    --destructive: oklch(0.7 0.2 25.4);
+    --border: oklch(0.33 0.03 43.8);
+    --input: oklch(0.33 0.03 43.8);
+    --ring: oklch(0.7 0.17 36.2);
   --color-sidebar: var(--sidebar);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
+* {
+  border-color: var(--border);
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, color-mix(in oklab, var(--accent) 22%, transparent), transparent 28%),
+    radial-gradient(circle at 85% 12%, color-mix(in oklab, var(--primary) 16%, transparent), transparent 30%),
+    var(--background);
+}
+
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
+  font-family: var(--font-space-grotesk), sans-serif;
+  min-height: 100vh;
   --color-input: var(--input);
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--primary) 35%, white);
+  color: var(--foreground);
+}
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);

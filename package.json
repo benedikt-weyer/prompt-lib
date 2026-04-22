@@ -3,6 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
+    "dev:api": "cargo run --manifest-path apps/api/Cargo.toml",
+    "check:api": "cargo check --manifest-path apps/api/Cargo.toml",
     "dev:web": "pnpm --dir apps/web dev",
     "build:web": "pnpm --dir apps/web build",
     "lint:web": "pnpm --dir apps/web lint"
