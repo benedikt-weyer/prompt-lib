@@ -13,8 +13,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  WEB_IMAGE_NAME: benedikt-weyer/prompt-lib-web
-  API_IMAGE_NAME: benedikt-weyer/prompt-lib-api
+  WEB_IMAGE_NAME: benedikt-weyer/prompt-lib-frontend-web
+  API_IMAGE_NAME: benedikt-weyer/prompt-lib-backend
 
 jobs:
   resolve-tag:
@@ -83,8 +83,8 @@ jobs:
       - name: Build and publish web image
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/web
-          file: ./apps/web/Dockerfile
+          context: ./apps/frontend-web
+          file: ./apps/frontend-web/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -124,7 +124,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./apps/api/Dockerfile
+          file: ./apps/backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

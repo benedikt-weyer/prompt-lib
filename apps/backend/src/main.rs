@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("bind API listener")?;
 
-    info!("prompt-lib-api listening on http://{bind_address}");
+    info!("prompt-lib-backend listening on http://{bind_address}");
     axum::serve(listener, app).await.context("run API server")?;
 
     Ok(())

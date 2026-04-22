@@ -8,4 +8,4 @@ if [[ "${1-}" == "--" ]]; then
 	shift
 fi
 
-cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- "$@"
+cargo run --manifest-path apps/backend/Cargo.toml --bin migrate -- "$@"

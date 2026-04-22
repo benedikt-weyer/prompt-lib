@@ -19,13 +19,13 @@ start_background \
   "Axum API" \
   "$RUN_DIR/api.pid" \
   "$LOG_DIR/api.log" \
-  cargo watch -x "run --manifest-path apps/api/Cargo.toml"
+  cargo watch -x "run --manifest-path apps/backend/Cargo.toml --bin prompt-lib-backend"
 
 start_background \
   "Next.js web" \
   "$RUN_DIR/web.pid" \
   "$LOG_DIR/web.log" \
-  pnpm --dir apps/web dev
+  pnpm --dir apps/frontend-web dev
 
 cat <<EOF
 Prompt Lib is starting.

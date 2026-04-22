@@ -113,7 +113,7 @@ pnpm run check:api
 
 ## Database Migrations
 
-Migrations live inside the backend at `apps/api/src/migration`.
+Migrations live inside the backend at `apps/backend/src/migration`.
 
 The API applies pending migrations automatically on startup.
 
@@ -139,20 +139,20 @@ pnpm run migrate:fresh
 
 Dockerfiles are provided for both apps:
 
-- `apps/web/Dockerfile`
-- `apps/api/Dockerfile`
+- `apps/frontend-web/Dockerfile`
+- `apps/backend/Dockerfile`
 
 Build the frontend image:
 
 ```bash
-cd apps/web
-docker build -t prompt-lib-web:test .
+cd apps/frontend-web
+docker build -t prompt-lib-frontend-web:test .
 ```
 
 Build the backend image from the repo root:
 
 ```bash
-docker build -f apps/api/Dockerfile -t prompt-lib-api:test .
+docker build -f apps/backend/Dockerfile -t prompt-lib-backend:test .
 ```
 
 The backend container exposes port `4000` and binds to `0.0.0.0` by default.
@@ -177,12 +177,12 @@ When a minor version is bumped, patch resets to `0`.
 
 ### Image Publishing
 
-`publish-images.yml` runs when a version tag like `v1.2.3` is pushed.
+`publish-images.yml` runs only after the `Create Version Tag` workflow completes successfully and resolves the semver tag created for that commit.
 
 It publishes both images to GitHub Container Registry:
 
-- `ghcr.io/benedikt-weyer/prompt-lib-web:<tag>`
-- `ghcr.io/benedikt-weyer/prompt-lib-api:<tag>`
+- `ghcr.io/benedikt-weyer/prompt-lib-frontend-web:<tag>`
+- `ghcr.io/benedikt-weyer/prompt-lib-backend:<tag>`
 
 The published container tag matches the Git tag name exactly.
 

@@ -3,15 +3,15 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev:api": "cargo run --manifest-path apps/api/Cargo.toml",
-    "check:api": "cargo check --manifest-path apps/api/Cargo.toml",
+    "dev:api": "cargo run --manifest-path apps/backend/Cargo.toml --bin prompt-lib-backend",
+    "check:api": "cargo check --manifest-path apps/backend/Cargo.toml",
     "migrate": "./scripts/migrate",
-    "migrate:up": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- up",
-    "migrate:down": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- down",
-    "migrate:status": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- status",
-    "migrate:fresh": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- fresh",
-    "dev:web": "pnpm --dir apps/web dev",
-    "build:web": "pnpm --dir apps/web build",
-    "lint:web": "pnpm --dir apps/web lint"
+    "migrate:up": "cargo run --manifest-path apps/backend/Cargo.toml --bin migrate -- up",
+    "migrate:down": "cargo run --manifest-path apps/backend/Cargo.toml --bin migrate -- down",
+    "migrate:status": "cargo run --manifest-path apps/backend/Cargo.toml --bin migrate -- status",
+    "migrate:fresh": "cargo run --manifest-path apps/backend/Cargo.toml --bin migrate -- fresh",
+    "dev:web": "pnpm --dir apps/frontend-web dev",
+    "build:web": "pnpm --dir apps/frontend-web build",
+    "lint:web": "pnpm --dir apps/frontend-web lint"
   }
 }
