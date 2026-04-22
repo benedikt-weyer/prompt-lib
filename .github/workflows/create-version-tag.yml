@@ -33,6 +33,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          major_regex='^feat(\([^)]+\))?!:'
+          minor_regex='^feat(\([^)]+\))?:'
+
           latest_tag="$(git tag --list 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
 
           if [[ -z "$latest_tag" ]]; then
@@ -42,12 +45,12 @@ jobs:
           version="${latest_tag#v}"
           IFS='.' read -r major minor patch <<< "$version"
 
-          if [[ "$COMMIT_MESSAGE" =~ ^feat(\([^)]+\))?!: ]]; then
+          if [[ "$COMMIT_MESSAGE" =~ $major_regex ]]; then
             major=$((major + 1))
             minor=0
             patch=0
             bump="major"
-          elif [[ "$COMMIT_MESSAGE" =~ ^feat(\([^)]+\))?: ]]; then
+          elif [[ "$COMMIT_MESSAGE" =~ $minor_regex ]]; then
             minor=$((minor + 1))
             patch=0
             bump="minor"
