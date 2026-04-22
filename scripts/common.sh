@@ -6,14 +6,16 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 RUN_DIR="$REPO_ROOT/.run"
 LOG_DIR="$REPO_ROOT/.logs"
+ENV_TEMPLATE_FILE="${PROMPT_LIB_ENV_TEMPLATE:-$REPO_ROOT/.env.example}"
+ENV_FILE="${PROMPT_LIB_ENV_FILE:-$REPO_ROOT/.env}"
 
 load_env() {
   local env_file
 
-  env_file="$REPO_ROOT/.env"
+  env_file="$ENV_FILE"
 
   if [[ ! -f "$env_file" ]]; then
-    env_file="$REPO_ROOT/.env.example"
+    env_file="$ENV_TEMPLATE_FILE"
   fi
 
   set -a
