@@ -1,41 +1,26 @@
-use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
+use sea_orm_migration::prelude::*;
 
-pub async fn ensure_database(database: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
-    database
-        .execute(Statement::from_string(
-            DatabaseBackend::Postgres,
-            r#"
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'thinking_effort') THEN
-                    CREATE TYPE thinking_effort AS ENUM ('low', 'medium', 'high');
-                END IF;
-            END
-            $$;
-            "#,
-        ))
-        .await?;
+#[derive(DeriveMigrationName)]
+pub struct Migration;
 
-    database
-        .execute(Statement::from_string(
-            DatabaseBackend::Postgres,
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let db = manager.get_connection();
+
+        db.execute_unprepared(
             r#"
-            CREATE TABLE IF NOT EXISTS users (
+            CREATE TYPE thinking_effort AS ENUM ('low', 'medium', 'high');
+
+            CREATE TABLE users (
                 id SERIAL PRIMARY KEY,
                 username VARCHAR(64) NOT NULL UNIQUE,
                 email VARCHAR(320) NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-            "#,
-        ))
-        .await?;
 
-    database
-        .execute(Statement::from_string(
-            DatabaseBackend::Postgres,
-            r#"
-            CREATE TABLE IF NOT EXISTS categories (
+            CREATE TABLE categories (
                 id SERIAL PRIMARY KEY,
                 creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 name VARCHAR(120) NOT NULL,
@@ -43,15 +28,8 @@ pub async fn ensure_database(database: &DatabaseConnection) -> Result<(), sea_or
                 description TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-            "#,
-        ))
-        .await?;
 
-    database
-        .execute(Statement::from_string(
-            DatabaseBackend::Postgres,
-            r#"
-            CREATE TABLE IF NOT EXISTS prompts (
+            CREATE TABLE prompts (
                 id SERIAL PRIMARY KEY,
                 creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
@@ -61,15 +39,8 @@ pub async fn ensure_database(database: &DatabaseConnection) -> Result<(), sea_or
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-            "#,
-        ))
-        .await?;
 
-    database
-        .execute(Statement::from_string(
-            DatabaseBackend::Postgres,
-            r#"
-            CREATE TABLE IF NOT EXISTS llm_frameworks (
+            CREATE TABLE llm_frameworks (
                 id SERIAL PRIMARY KEY,
                 creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 name VARCHAR(160) NOT NULL,
@@ -77,15 +48,8 @@ pub async fn ensure_database(database: &DatabaseConnection) -> Result<(), sea_or
                 description TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-            "#,
-        ))
-        .await?;
 
-    database
-        .execute(Statement::from_string(
-            DatabaseBackend::Postgres,
-            r#"
-            CREATE TABLE IF NOT EXISTS llm_models (
+            CREATE TABLE llm_models (
                 id SERIAL PRIMARY KEY,
                 creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 framework_id INTEGER NOT NULL REFERENCES llm_frameworks(id) ON DELETE RESTRICT,
@@ -95,15 +59,8 @@ pub async fn ensure_database(database: &DatabaseConnection) -> Result<(), sea_or
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE (framework_id, slug)
             );
-            "#,
-        ))
-        .await?;
 
-    database
-        .execute(Statement::from_string(
-            DatabaseBackend::Postgres,
-            r#"
-            CREATE TABLE IF NOT EXISTS reviews (
+            CREATE TABLE reviews (
                 id SERIAL PRIMARY KEY,
                 prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
                 reviewer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -112,8 +69,28 @@ pub async fn ensure_database(database: &DatabaseConnection) -> Result<(), sea_or
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             "#,
-        ))
+        )
         .await?;
 
-    Ok(())
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let db = manager.get_connection();
+
+        db.execute_unprepared(
+            r#"
+            DROP TABLE reviews;
+            DROP TABLE llm_models;
+            DROP TABLE llm_frameworks;
+            DROP TABLE prompts;
+            DROP TABLE categories;
+            DROP TABLE users;
+            DROP TYPE thinking_effort;
+            "#,
+        )
+        .await?;
+
+        Ok(())
+    }
 }

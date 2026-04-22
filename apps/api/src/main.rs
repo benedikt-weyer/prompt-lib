@@ -1,18 +1,19 @@
 mod config;
-mod database;
 mod entities;
 mod error;
+mod migration;
 mod models;
 mod routes;
 mod state;
 
 use anyhow::Context;
 use sea_orm::Database;
+use sea_orm_migration::MigratorTrait;
 use tokio::net::TcpListener;
 use tracing::info;
 
 use crate::config::AppConfig;
-use crate::database::ensure_database;
+use crate::migration::Migrator;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -24,9 +25,9 @@ async fn main() -> anyhow::Result<()> {
     let database = Database::connect(&config.database_url)
         .await
         .context("connect to PostgreSQL")?;
-    ensure_database(&database)
+    Migrator::up(&database, None)
         .await
-        .context("initialize database schema")?;
+        .context("run database migrations")?;
 
     let bind_address = config.bind_address();
     let state = AppState::new(config, database);

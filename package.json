@@ -5,6 +5,10 @@
   "scripts": {
     "dev:api": "cargo run --manifest-path apps/api/Cargo.toml",
     "check:api": "cargo check --manifest-path apps/api/Cargo.toml",
+    "migrate:up": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- up",
+    "migrate:down": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- down",
+    "migrate:status": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- status",
+    "migrate:fresh": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- fresh",
     "dev:web": "pnpm --dir apps/web dev",
     "build:web": "pnpm --dir apps/web build",
     "lint:web": "pnpm --dir apps/web lint"
