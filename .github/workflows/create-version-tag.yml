@@ -29,43 +29,72 @@ jobs:
       - name: Compute next version tag
         id: version
         env:
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
           major_regex='^feat(\([^)]+\))?!:'
           minor_regex='^feat(\([^)]+\))?:'
 
-          latest_tag="$(git tag --list 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+          head_tag="$(git tag --points-at "$COMMIT_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+
+          if [[ -n "$head_tag" ]]; then
+            echo "latest_tag=$head_tag" >> "$GITHUB_OUTPUT"
+            echo "next_tag=$head_tag" >> "$GITHUB_OUTPUT"
+            echo "bump=none" >> "$GITHUB_OUTPUT"
+            echo "already_tagged=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          latest_tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' "$COMMIT_SHA" 2>/dev/null || true)"
 
           if [[ -z "$latest_tag" ]]; then
             latest_tag="v0.0.0"
+            commit_range="$(git rev-list --reverse "$COMMIT_SHA")"
+          else
+            commit_range="$(git rev-list --reverse "${latest_tag}..${COMMIT_SHA}")"
           fi
 
           version="${latest_tag#v}"
           IFS='.' read -r major minor patch <<< "$version"
+          last_bump="none"
 
-          if [[ "$COMMIT_MESSAGE" =~ $major_regex ]]; then
-            major=$((major + 1))
-            minor=0
-            patch=0
-            bump="major"
-          elif [[ "$COMMIT_MESSAGE" =~ $minor_regex ]]; then
-            minor=$((minor + 1))
-            patch=0
-            bump="minor"
-          else
-            patch=$((patch + 1))
-            bump="patch"
+          if [[ -z "$commit_range" ]]; then
+            echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+            echo "next_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+            echo "bump=none" >> "$GITHUB_OUTPUT"
+            echo "already_tagged=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          while IFS= read -r commit_sha; do
+            [[ -z "$commit_sha" ]] && continue
+            commit_subject="$(git log -1 --format=%s "$commit_sha")"
+
+            if [[ "$commit_subject" =~ $major_regex ]]; then
+              major=$((major + 1))
+              minor=0
+              patch=0
+              last_bump="major"
+            elif [[ "$commit_subject" =~ $minor_regex ]]; then
+              minor=$((minor + 1))
+              patch=0
+              last_bump="minor"
+            else
+              patch=$((patch + 1))
+              last_bump="patch"
+            fi
+          done <<< "$commit_range"
 
           next_tag="v${major}.${minor}.${patch}"
 
           echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
           echo "next_tag=$next_tag" >> "$GITHUB_OUTPUT"
-          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+          echo "bump=$last_bump" >> "$GITHUB_OUTPUT"
+          echo "already_tagged=false" >> "$GITHUB_OUTPUT"
 
       - name: Create and push tag
+        if: ${{ steps.version.outputs.already_tagged != 'true' }}
         env:
           NEXT_TAG: ${{ steps.version.outputs.next_tag }}
           BUMP: ${{ steps.version.outputs.bump }}
