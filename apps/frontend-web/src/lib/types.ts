@@ -46,9 +46,11 @@ export type CatalogReview = {
 
 export type CatalogPrompt = {
   id: number;
+  creator_id: number;
   name: string;
   slug: string;
   prompt: string;
+  is_public: boolean;
   author_name: string;
   category: CatalogCategory;
   review_count: number;

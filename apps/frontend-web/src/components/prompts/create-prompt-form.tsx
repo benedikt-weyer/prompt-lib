@@ -58,10 +58,12 @@ export function CreatePromptForm() {
     const nameValue = formData.get("name");
     const promptValue = formData.get("prompt");
     const categoryValue = formData.get("categoryId");
+    const visibilityValue = formData.get("visibility");
 
     const name = typeof nameValue === "string" ? nameValue.trim() : "";
     const prompt = typeof promptValue === "string" ? promptValue.trim() : "";
     const categoryId = typeof categoryValue === "string" ? Number(categoryValue) : Number.NaN;
+    const isPublic = visibilityValue === "public";
 
     try {
       const response = await fetch(`${apiUrl}/api/prompts`, {
@@ -74,6 +76,7 @@ export function CreatePromptForm() {
           name,
           prompt,
           category_id: categoryId,
+          is_public: isPublic,
         }),
       });
 
@@ -153,6 +156,22 @@ export function CreatePromptForm() {
             disabled={pending}
             required
           />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="visibility">Visibility</Label>
+          <select
+            id="visibility"
+            name="visibility"
+            disabled={pending}
+            className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            defaultValue="private"
+          >
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+          </select>
+          <p className="text-sm text-muted-foreground">
+            Private prompts are only visible to you. Public prompts appear on the public home page.
+          </p>
         </div>
         <Button type="submit" disabled={pending || authLoading || loadingCategories}>
           {pending ? "Creating prompt..." : "Create prompt"}

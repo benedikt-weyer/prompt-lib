@@ -248,6 +248,13 @@ pub(crate) fn current_user_id_from_headers(
     authenticate_request(state, headers).map(|claims| claims.sub)
 }
 
+pub(crate) fn optional_current_user_id_from_headers(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Option<i32> {
+    authenticate_request(state, headers).ok().map(|claims| claims.sub)
+}
+
 fn authenticate_request(state: &AppState, headers: &HeaderMap) -> Result<AuthClaims, ApiError> {
     let token = extract_auth_cookie(headers).ok_or(ApiError::Unauthorized)?;
 

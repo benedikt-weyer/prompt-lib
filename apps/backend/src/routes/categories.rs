@@ -14,13 +14,18 @@ pub fn router() -> Router<AppState> {
     Router::new().route("/", get(list_categories).post(create_category))
 }
 
-async fn list_categories(State(state): State<AppState>) -> Result<Json<Vec<CategoryResponse>>, ApiError> {
+async fn list_categories(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<CategoryResponse>>, ApiError> {
+    let viewer_user_id = super::auth::optional_current_user_id_from_headers(&state, &headers);
     let records = category::Entity::find().all(&state.database).await?;
     let mut response = Vec::with_capacity(records.len());
 
     for record in records {
         let prompt_count = prompt::Entity::find()
             .filter(prompt::Column::CategoryId.eq(record.id))
+            .filter(super::prompts::visible_prompt_condition(viewer_user_id))
             .count(&state.database)
             .await?;
 

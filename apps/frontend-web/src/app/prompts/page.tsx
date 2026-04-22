@@ -97,6 +97,9 @@ export default function PromptsPage() {
                 <div className="flex flex-wrap gap-2">
                   <Badge className="rounded-full bg-secondary text-secondary-foreground">{prompt.category.name}</Badge>
                   <Badge variant="outline" className="rounded-full">{prompt.review_count} reviews</Badge>
+                  <Badge variant="outline" className="rounded-full">
+                    {prompt.is_public ? "Public" : "Private"}
+                  </Badge>
                 </div>
                 <CardTitle className="text-2xl">{prompt.name}</CardTitle>
               </CardHeader>

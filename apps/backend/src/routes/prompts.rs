@@ -1,28 +1,58 @@
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::routing::get;
+use axum::routing::{get, patch};
 use axum::{Json, Router};
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, Set};
 
 use crate::entities::{category, prompt, review, user};
 use crate::error::ApiError;
-use crate::models::{CategoryResponse, CreatePromptRequest, PromptResponse};
+use crate::models::{CategoryResponse, CreatePromptRequest, PromptResponse, UpdatePromptVisibilityRequest};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_prompts).post(create_prompt))
+        .route("/{prompt_id}/visibility", patch(update_prompt_visibility))
         .route("/slug/{slug}", get(get_prompt))
         .nest("/{prompt_id}/reviews", super::reviews::router())
 }
 
-async fn list_prompts(State(state): State<AppState>) -> Result<Json<Vec<PromptResponse>>, ApiError> {
-    let records = prompt::Entity::find().all(&state.database).await?;
+pub(crate) fn visible_prompt_condition(viewer_user_id: Option<i32>) -> Condition {
+    match viewer_user_id {
+        Some(viewer_user_id) => Condition::any()
+            .add(prompt::Column::IsPublic.eq(true))
+            .add(prompt::Column::CreatorId.eq(viewer_user_id)),
+        None => Condition::all().add(prompt::Column::IsPublic.eq(true)),
+    }
+}
+
+pub(crate) async fn find_visible_prompt_by_id(
+    state: &AppState,
+    prompt_id: i32,
+    viewer_user_id: Option<i32>,
+) -> Result<prompt::Model, ApiError> {
+    prompt::Entity::find_by_id(prompt_id)
+        .filter(visible_prompt_condition(viewer_user_id))
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)
+}
+
+async fn list_prompts(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<PromptResponse>>, ApiError> {
+    let viewer_user_id = super::auth::optional_current_user_id_from_headers(&state, &headers);
+    let records = prompt::Entity::find()
+        .filter(visible_prompt_condition(viewer_user_id))
+        .order_by_desc(prompt::Column::UpdatedAt)
+        .all(&state.database)
+        .await?;
     let mut response = Vec::with_capacity(records.len());
 
     for record in records {
-        response.push(build_prompt_response(&state, record).await?);
+        response.push(build_prompt_response(&state, record, viewer_user_id).await?);
     }
 
     Ok(Json(response))
@@ -49,7 +79,7 @@ async fn create_prompt(
         ));
     }
 
-    let category_record = category::Entity::find_by_id(payload.category_id)
+    category::Entity::find_by_id(payload.category_id)
         .one(&state.database)
         .await?
         .ok_or_else(|| ApiError::Validation("category_id must reference an existing category".to_string()))?;
@@ -68,6 +98,7 @@ async fn create_prompt(
         name: Set(name),
         slug: Set(slug),
         prompt: Set(prompt_body),
+        is_public: Set(payload.is_public),
         created_at: Set(Utc::now()),
         updated_at: Set(Utc::now()),
         ..Default::default()
@@ -75,52 +106,57 @@ async fn create_prompt(
     .insert(&state.database)
     .await?;
 
-    let author = user::Entity::find_by_id(creator_id)
-        .one(&state.database)
-        .await?
-        .ok_or(ApiError::Unauthorized)?;
-    let (review_count, average_stars) = prompt_review_metrics(&state, created.id).await?;
-
     Ok((
         StatusCode::CREATED,
-        Json(PromptResponse {
-            id: created.id,
-            name: created.name,
-            slug: created.slug,
-            prompt: created.prompt,
-            author_name: author.username,
-            category: CategoryResponse {
-                id: category_record.id,
-                name: category_record.name,
-                slug: category_record.slug,
-                description: category_record.description,
-                prompt_count: prompt::Entity::find()
-                    .filter(prompt::Column::CategoryId.eq(category_record.id))
-                    .count(&state.database)
-                    .await?,
-            },
-            review_count,
-            average_stars,
-        }),
+        Json(build_prompt_response(&state, created, Some(creator_id)).await?),
     ))
 }
 
-async fn get_prompt(
+async fn update_prompt_visibility(
     State(state): State<AppState>,
-    Path(slug): Path<String>,
+    Path(prompt_id): Path<i32>,
+    headers: HeaderMap,
+    Json(payload): Json<UpdatePromptVisibilityRequest>,
 ) -> Result<Json<PromptResponse>, ApiError> {
-    let record = prompt::Entity::find()
-        .filter(prompt::Column::Slug.eq(slug))
+    let creator_id = super::auth::current_user_id_from_headers(&state, &headers)?;
+
+    let record = prompt::Entity::find_by_id(prompt_id)
         .one(&state.database)
         .await?
         .ok_or(ApiError::NotFound)?;
 
-    Ok(Json(build_prompt_response(&state, record).await?))
+    if record.creator_id != creator_id {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let mut active_model = record.into_active_model();
+    active_model.is_public = Set(payload.is_public);
+    active_model.updated_at = Set(Utc::now());
+    let updated = active_model.update(&state.database).await?;
+
+    Ok(Json(build_prompt_response(&state, updated, Some(creator_id)).await?))
+}
+
+async fn get_prompt(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+) -> Result<Json<PromptResponse>, ApiError> {
+    let viewer_user_id = super::auth::optional_current_user_id_from_headers(&state, &headers);
+    let record = prompt::Entity::find()
+        .filter(prompt::Column::Slug.eq(slug))
+        .filter(visible_prompt_condition(viewer_user_id))
+        .one(&state.database)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    Ok(Json(build_prompt_response(&state, record, viewer_user_id).await?))
 }
 
 async fn build_prompt_response(
     state: &AppState,
     record: prompt::Model,
+    viewer_user_id: Option<i32>,
 ) -> Result<PromptResponse, ApiError> {
     let category_record = category::Entity::find_by_id(record.category_id)
         .one(&state.database)
@@ -133,14 +169,17 @@ async fn build_prompt_response(
     let (review_count, average_stars) = prompt_review_metrics(state, record.id).await?;
     let prompt_count = prompt::Entity::find()
         .filter(prompt::Column::CategoryId.eq(category_record.id))
+        .filter(visible_prompt_condition(viewer_user_id))
         .count(&state.database)
         .await?;
 
     Ok(PromptResponse {
         id: record.id,
+        creator_id: record.creator_id,
         name: record.name,
         slug: record.slug,
         prompt: record.prompt,
+        is_public: record.is_public,
         author_name: author.username,
         category: CategoryResponse {
             id: category_record.id,

@@ -2,12 +2,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
-pub struct FeatureStatusResponse {
-    pub status: &'static str,
-    pub message: &'static str,
-}
-
-#[derive(Debug, Clone, Serialize)]
 pub struct AuthUserResponse {
     pub id: i32,
     pub username: String,
@@ -74,9 +68,11 @@ pub struct ReviewResponse {
 #[derive(Debug, Clone, Serialize)]
 pub struct PromptResponse {
     pub id: i32,
+    pub creator_id: i32,
     pub name: String,
     pub slug: String,
     pub prompt: String,
+    pub is_public: bool,
     pub author_name: String,
     pub category: CategoryResponse,
     pub review_count: u64,
@@ -160,6 +156,13 @@ pub struct CreatePromptRequest {
     pub category_id: i32,
     pub name: String,
     pub prompt: String,
+    #[serde(default)]
+    pub is_public: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePromptVisibilityRequest {
+    pub is_public: bool,
 }
 
 #[derive(Debug, Deserialize)]

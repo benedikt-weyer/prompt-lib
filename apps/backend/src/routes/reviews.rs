@@ -5,7 +5,7 @@ use axum::{Json, Router};
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
-use crate::entities::{llm_model, prompt, review, user};
+use crate::entities::{llm_model, review, user};
 use crate::error::ApiError;
 use crate::models::{CreateReviewRequest, ReviewResponse};
 use crate::state::AppState;
@@ -16,6 +16,7 @@ pub fn router() -> Router<AppState> {
 
 async fn list_reviews(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(prompt_id): Path<i32>,
 ) -> Result<Json<Vec<ReviewResponse>>, ApiError> {
     if prompt_id <= 0 {
@@ -24,10 +25,8 @@ async fn list_reviews(
         ));
     }
 
-    prompt::Entity::find_by_id(prompt_id)
-        .one(&state.database)
-        .await?
-        .ok_or(ApiError::NotFound)?;
+    let viewer_user_id = super::auth::optional_current_user_id_from_headers(&state, &headers);
+    super::prompts::find_visible_prompt_by_id(&state, prompt_id, viewer_user_id).await?;
 
     let records = review::Entity::find()
         .filter(review::Column::PromptId.eq(prompt_id))
@@ -69,10 +68,7 @@ async fn create_review(
 
     let reviewer_id = super::auth::current_user_id_from_headers(&state, &headers)?;
 
-    prompt::Entity::find_by_id(prompt_id)
-        .one(&state.database)
-        .await?
-        .ok_or(ApiError::NotFound)?;
+    super::prompts::find_visible_prompt_by_id(&state, prompt_id, Some(reviewer_id)).await?;
 
     llm_model::Entity::find_by_id(payload.llm_model_id)
         .one(&state.database)
