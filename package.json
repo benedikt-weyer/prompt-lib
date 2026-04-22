@@ -5,6 +5,7 @@
   "scripts": {
     "dev:api": "cargo run --manifest-path apps/api/Cargo.toml",
     "check:api": "cargo check --manifest-path apps/api/Cargo.toml",
+    "migrate": "./scripts/migrate",
     "migrate:up": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- up",
     "migrate:down": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- down",
     "migrate:status": "cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- status",

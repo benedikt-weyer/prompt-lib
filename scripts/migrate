@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+cd "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ "${1-}" == "--" ]]; then
+	shift
+fi
+
+cargo run --manifest-path apps/api/Cargo.toml --bin migrate -- "$@"
