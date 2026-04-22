@@ -61,8 +61,8 @@ export default function PromptsPage() {
             <Link href="/models/new" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full")}>
               New model
             </Link>
-            <Link href="/categories/new" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full")}>
-              New category
+            <Link href="/categories" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full")}>
+              Categories
             </Link>
             <Link href="/prompts/new" className={cn(buttonVariants({ size: "lg" }), "rounded-full")}>
               New prompt
@@ -80,8 +80,8 @@ export default function PromptsPage() {
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>Create the first category and prompt to populate the library.</span>
-              <Link href="/categories/new" className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}>
-                Create category
+              <Link href="/categories" className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}>
+                Open categories
               </Link>
               <Link href="/prompts/new" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
                 Create prompt

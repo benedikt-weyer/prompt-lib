@@ -25,10 +25,10 @@ export function SiteHeader() {
     navActions = (
       <>
         <Link
-          href="/categories/new"
+          href="/categories"
           className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
         >
-          New category
+          Categories
         </Link>
         <Link
           href="/prompts/new"

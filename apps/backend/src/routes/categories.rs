@@ -3,7 +3,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::routing::get;
 use axum::{Json, Router};
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 
 use crate::entities::{category, prompt};
 use crate::error::ApiError;
@@ -19,7 +19,10 @@ async fn list_categories(
     headers: HeaderMap,
 ) -> Result<Json<Vec<CategoryResponse>>, ApiError> {
     let viewer_user_id = super::auth::optional_current_user_id_from_headers(&state, &headers);
-    let records = category::Entity::find().all(&state.database).await?;
+    let records = category::Entity::find()
+        .order_by_asc(category::Column::Name)
+        .all(&state.database)
+        .await?;
     let mut response = Vec::with_capacity(records.len());
 
     for record in records {
@@ -31,6 +34,7 @@ async fn list_categories(
 
         response.push(CategoryResponse {
             id: record.id,
+            parent_category_id: record.parent_category_id,
             name: record.name,
             slug: record.slug,
             description: record.description,
@@ -54,6 +58,7 @@ async fn create_category(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
+    let parent_category_id = payload.parent_category_id;
 
     if name.is_empty() {
         return Err(ApiError::Validation(
@@ -69,6 +74,23 @@ async fn create_category(
         ));
     }
 
+    if let Some(parent_category_id) = parent_category_id {
+        if parent_category_id <= 0 {
+            return Err(ApiError::Validation(
+                "parent_category_id must be a positive integer when provided".to_string(),
+            ));
+        }
+
+        category::Entity::find_by_id(parent_category_id)
+            .one(&state.database)
+            .await?
+            .ok_or_else(|| {
+                ApiError::Validation(
+                    "parent_category_id must reference an existing category".to_string(),
+                )
+            })?;
+    }
+
     let existing = category::Entity::find()
         .filter(category::Column::Slug.eq(slug.clone()))
         .one(&state.database)
@@ -82,6 +104,7 @@ async fn create_category(
 
     let created = category::ActiveModel {
         creator_id: Set(creator_id),
+        parent_category_id: Set(parent_category_id),
         name: Set(name),
         slug: Set(slug),
         description: Set(description),
@@ -95,6 +118,7 @@ async fn create_category(
         StatusCode::CREATED,
         Json(CategoryResponse {
             id: created.id,
+            parent_category_id: created.parent_category_id,
             name: created.name,
             slug: created.slug,
             description: created.description,

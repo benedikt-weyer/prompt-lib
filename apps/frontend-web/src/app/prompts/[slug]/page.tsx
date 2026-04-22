@@ -529,8 +529,8 @@ function PromptSidebar({
             <Link href="/prompts/new" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
               Create another prompt
             </Link>
-            <Link href="/categories/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}>
-              Create category
+            <Link href="/categories" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}>
+              Open categories
             </Link>
           </div>
         </CardContent>

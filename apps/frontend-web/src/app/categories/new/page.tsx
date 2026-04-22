@@ -11,7 +11,7 @@ export default function NewCategoryPage() {
           <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Categories</p>
           <h1 className="text-4xl font-semibold tracking-tight">Create a category</h1>
           <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
-            Categories are now persisted in Postgres and linked to the authenticated user who created them.
+            Categories can now be nested. Main categories have no parent category, and subcategories sit beneath the parent you select.
           </p>
         </div>
         <Card className="border-border/70 bg-card/95">

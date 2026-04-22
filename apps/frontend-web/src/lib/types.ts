@@ -6,6 +6,7 @@ export type AuthUser = {
 
 export type CatalogCategory = {
   id: number;
+  parent_category_id: number | null;
   name: string;
   slug: string;
   description: string | null;

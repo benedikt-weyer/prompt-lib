@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -15,6 +15,26 @@ import type { CatalogCategory, CatalogPrompt } from "@/lib/types";
 type CreatePromptResult = CatalogPrompt & {
   message?: string;
 };
+
+function buildCategoryLabel(category: CatalogCategory, categoriesById: Map<number, CatalogCategory>) {
+  const parts = [category.name];
+  const visited = new Set<number>([category.id]);
+  let currentParentId = category.parent_category_id;
+
+  while (currentParentId !== null) {
+    const parentCategory = categoriesById.get(currentParentId);
+
+    if (!parentCategory || visited.has(parentCategory.id)) {
+      break;
+    }
+
+    parts.unshift(parentCategory.name);
+    visited.add(parentCategory.id);
+    currentParentId = parentCategory.parent_category_id;
+  }
+
+  return parts.join(" / ");
+}
 
 function getSubmitButtonLabel(isEditMode: boolean, pending: boolean) {
   if (pending) {
@@ -37,6 +57,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
   const [error, setError] = useState<string | null>(null);
   const isEditMode = initialPrompt !== undefined;
   const submitButtonLabel = getSubmitButtonLabel(isEditMode, pending);
+  const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,7 +147,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
   if (!loadingCategories && categories.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Create a <Link href="/categories/new" className="font-medium text-primary">category</Link> first so prompts can be filed correctly.
+        Create a <Link href="/categories" className="font-medium text-primary">category</Link> first so prompts can be filed correctly.
       </p>
     );
   }
@@ -165,7 +186,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             </option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {buildCategoryLabel(category, categoriesById)}
               </option>
             ))}
           </select>

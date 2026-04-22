@@ -266,6 +266,7 @@ async fn build_prompt_response(
         author_name: author.username,
         category: CategoryResponse {
             id: category_record.id,
+            parent_category_id: category_record.parent_category_id,
             name: category_record.name,
             slug: category_record.slug,
             description: category_record.description,

@@ -25,6 +25,7 @@ pub struct SessionResponse {
 #[derive(Debug, Clone, Serialize)]
 pub struct CategoryResponse {
     pub id: i32,
+    pub parent_category_id: Option<i32>,
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
@@ -150,6 +151,7 @@ pub struct LoginRequest {
 pub struct CreateCategoryRequest {
     pub name: String,
     pub description: Option<String>,
+    pub parent_category_id: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
