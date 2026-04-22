@@ -1,5 +1,3 @@
-export type ThinkingEffort = "low" | "medium" | "high";
-
 export type AuthUser = {
   id: number;
   username: string;
@@ -20,6 +18,19 @@ export type LlmFrameworkSummary = {
   slug: string;
 };
 
+export type CatalogLlmModelThinkingEffort = {
+  id: number;
+  name: string;
+  slug: string;
+  is_default: boolean;
+};
+
+export type CatalogLlmModelSummary = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
 export type CatalogLlmFramework = {
   id: number;
   name: string;
@@ -30,17 +41,19 @@ export type CatalogLlmFramework = {
 
 export type CatalogLlmModel = {
   id: number;
+  creator_id: number;
   name: string;
   slug: string;
-  thinking_effort: ThinkingEffort;
-  framework: LlmFrameworkSummary;
+  thinking_efforts: CatalogLlmModelThinkingEffort[];
 };
 
 export type CatalogReview = {
   id: number;
   stars: number;
   reviewer_name: string;
-  llm_model: CatalogLlmModel;
+  llm_model: CatalogLlmModelSummary;
+  llm_framework: LlmFrameworkSummary;
+  thinking_effort: CatalogLlmModelThinkingEffort;
   created_at: string;
 };
 
@@ -70,7 +83,7 @@ export type Review = {
   authorName: string;
   stars: number;
   llmModelName: string;
-  thinkingEffort: ThinkingEffort;
+  thinkingEffort: string;
   llmFramework: string;
   notes: string;
   createdAt: string;

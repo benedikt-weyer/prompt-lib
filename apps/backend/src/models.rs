@@ -39,6 +39,21 @@ pub struct LlmFrameworkSummaryResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct LlmModelSummaryResponse {
+    pub id: i32,
+    pub name: String,
+    pub slug: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LlmModelThinkingEffortResponse {
+    pub id: i32,
+    pub name: String,
+    pub slug: String,
+    pub is_default: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct LlmFrameworkResponse {
     pub id: i32,
     pub name: String,
@@ -50,10 +65,10 @@ pub struct LlmFrameworkResponse {
 #[derive(Debug, Clone, Serialize)]
 pub struct LlmModelResponse {
     pub id: i32,
+    pub creator_id: i32,
     pub name: String,
     pub slug: String,
-    pub thinking_effort: ThinkingEffortDto,
-    pub framework: LlmFrameworkSummaryResponse,
+    pub thinking_efforts: Vec<LlmModelThinkingEffortResponse>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -61,7 +76,9 @@ pub struct ReviewResponse {
     pub id: i32,
     pub stars: i16,
     pub reviewer_name: String,
-    pub llm_model: LlmModelResponse,
+    pub llm_model: LlmModelSummaryResponse,
+    pub llm_framework: LlmFrameworkSummaryResponse,
+    pub thinking_effort: LlmModelThinkingEffortResponse,
     pub created_at: DateTime<Utc>,
 }
 
@@ -141,14 +158,17 @@ pub struct CreateLlmFrameworkRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateLlmModelRequest {
-    pub framework_id: i32,
     pub name: String,
-    pub thinking_effort: ThinkingEffortDto,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ListLlmModelsQuery {
-    pub framework_id: Option<i32>,
+pub struct UpdateLlmModelRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateLlmModelThinkingEffortRequest {
+    pub name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -177,4 +197,6 @@ pub struct UpdatePromptRequest {
 pub struct CreateReviewRequest {
     pub stars: i16,
     pub llm_model_id: i32,
+    pub llm_framework_id: i32,
+    pub llm_model_thinking_effort_id: i32,
 }

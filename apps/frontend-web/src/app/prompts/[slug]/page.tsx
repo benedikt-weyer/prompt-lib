@@ -224,7 +224,7 @@ function PromptMainSection({
           <div className="space-y-4">
             <h1 className="text-4xl font-semibold tracking-tight">{prompt.name}</h1>
             <p className="max-w-3xl text-sm leading-7 text-muted-foreground">
-              Added by {prompt.author_name}. Reviews now persist against an LLM model, and each model belongs to a single framework with its own linked thinking effort.
+              Added by {prompt.author_name}. Reviews now persist against an LLM model, an independent framework, and a model-specific thinking effort.
             </p>
           </div>
           <Card className="border-border/70 bg-card/90">
@@ -252,8 +252,8 @@ function PromptMainSection({
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge className="rounded-full bg-secondary text-secondary-foreground">{review.stars} / 10</Badge>
                         <Badge variant="outline" className="rounded-full">{review.llm_model.name}</Badge>
-                        <Badge variant="outline" className="rounded-full">{review.llm_model.thinking_effort}</Badge>
-                        <Badge variant="outline" className="rounded-full">{review.llm_model.framework.name}</Badge>
+                        <Badge variant="outline" className="rounded-full">{review.thinking_effort.name}</Badge>
+                        <Badge variant="outline" className="rounded-full">{review.llm_framework.name}</Badge>
                       </div>
                       <p className="mt-3 text-sm text-muted-foreground">
                         Reviewed by {review.reviewer_name} on {new Date(review.created_at).toLocaleDateString()}.
@@ -263,7 +263,7 @@ function PromptMainSection({
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No review runs yet. Add the first one with a model and framework below.
+                  No review runs yet. Add the first one with a model, thinking effort, and framework below.
                 </p>
               )}
             </CardContent>

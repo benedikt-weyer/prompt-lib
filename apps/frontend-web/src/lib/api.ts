@@ -48,14 +48,9 @@ export async function fetchLlmFrameworks(): Promise<CatalogLlmFramework[]> {
 }
 
 export async function fetchLlmModels(frameworkId?: number): Promise<CatalogLlmModel[]> {
-  const searchParams = new URLSearchParams();
+  void frameworkId;
 
-  if (frameworkId !== undefined) {
-    searchParams.set("framework_id", String(frameworkId));
-  }
-
-  const suffix = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
-  const response = await fetch(`${apiUrl}/api/llm-models${suffix}`, {
+  const response = await fetch(`${apiUrl}/api/llm-models`, {
     cache: "no-store",
     credentials: "include",
   });
@@ -65,6 +60,23 @@ export async function fetchLlmModels(frameworkId?: number): Promise<CatalogLlmMo
   }
 
   return (await response.json()) as CatalogLlmModel[];
+}
+
+export async function fetchLlmModelBySlug(slug: string): Promise<CatalogLlmModel | null> {
+  const response = await fetch(`${apiUrl}/api/llm-models/slug/${slug}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to load LLM model.");
+  }
+
+  return (await response.json()) as CatalogLlmModel;
 }
 
 export async function fetchReviews(promptId: number): Promise<CatalogReview[]> {

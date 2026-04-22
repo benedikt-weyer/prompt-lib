@@ -11,7 +11,7 @@ export default function NewModelPage() {
           <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">LLM models</p>
           <h1 className="text-4xl font-semibold tracking-tight">Create an LLM model</h1>
           <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
-            Models belong to a framework and carry their own thinking effort, so review runs can be compared precisely.
+            Models are independent from frameworks. Each new model starts with the default thinking efforts unknown and none, and you can manage extra efforts in the edit screen.
           </p>
         </div>
         <Card className="border-border/70 bg-card/95">

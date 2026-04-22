@@ -1,17 +1,13 @@
 use sea_orm::entity::prelude::*;
 
-use super::thinking_effort::ThinkingEffort;
-
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "llm_models")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub creator_id: i32,
-    pub framework_id: i32,
     pub name: String,
     pub slug: String,
-    pub thinking_effort: ThinkingEffort,
     pub created_at: DateTimeUtc,
 }
 
@@ -25,27 +21,15 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Creator,
-    #[sea_orm(
-        belongs_to = "super::llm_framework::Entity",
-        from = "Column::FrameworkId",
-        to = "super::llm_framework::Column::Id",
-        on_update = "Cascade",
-        on_delete = "Restrict"
-    )]
-    Framework,
     #[sea_orm(has_many = "super::review::Entity")]
     Reviews,
+    #[sea_orm(has_many = "super::llm_model_thinking_effort::Entity")]
+    ThinkingEfforts,
 }
 
 impl Related<super::user::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Creator.def()
-    }
-}
-
-impl Related<super::llm_framework::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Framework.def()
     }
 }
 

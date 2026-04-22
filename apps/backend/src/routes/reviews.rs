@@ -5,9 +5,9 @@ use axum::{Json, Router};
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
-use crate::entities::{llm_model, review, user};
+use crate::entities::{llm_framework, llm_model, llm_model_thinking_effort, review, user};
 use crate::error::ApiError;
-use crate::models::{CreateReviewRequest, ReviewResponse};
+use crate::models::{CreateReviewRequest, LlmFrameworkSummaryResponse, ReviewResponse};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -66,19 +66,53 @@ async fn create_review(
         ));
     }
 
+    if payload.llm_framework_id <= 0 {
+        return Err(ApiError::Validation(
+            "llm_framework_id must be a positive integer".to_string(),
+        ));
+    }
+
+    if payload.llm_model_thinking_effort_id <= 0 {
+        return Err(ApiError::Validation(
+            "llm_model_thinking_effort_id must be a positive integer".to_string(),
+        ));
+    }
+
     let reviewer_id = super::auth::current_user_id_from_headers(&state, &headers)?;
 
     super::prompts::find_visible_prompt_by_id(&state, prompt_id, Some(reviewer_id)).await?;
 
-    llm_model::Entity::find_by_id(payload.llm_model_id)
+    let model = llm_model::Entity::find_by_id(payload.llm_model_id)
         .one(&state.database)
         .await?
         .ok_or_else(|| ApiError::Validation("llm_model_id must reference an existing model".to_string()))?;
+
+    llm_framework::Entity::find_by_id(payload.llm_framework_id)
+        .one(&state.database)
+        .await?
+        .ok_or_else(|| ApiError::Validation("llm_framework_id must reference an existing framework".to_string()))?;
+
+    let thinking_effort = llm_model_thinking_effort::Entity::find_by_id(payload.llm_model_thinking_effort_id)
+        .one(&state.database)
+        .await?
+        .ok_or_else(|| {
+            ApiError::Validation(
+                "llm_model_thinking_effort_id must reference an existing thinking effort".to_string(),
+            )
+        })?;
+
+    if thinking_effort.llm_model_id != model.id {
+        return Err(ApiError::Validation(
+            "thinking effort must belong to the selected model".to_string(),
+        ));
+    }
 
     let created = review::ActiveModel {
         prompt_id: Set(prompt_id),
         reviewer_id: Set(reviewer_id),
         llm_model_id: Set(payload.llm_model_id),
+        llm_framework_id: Set(payload.llm_framework_id),
+        llm_model_thinking_effort_id: Set(payload.llm_model_thinking_effort_id),
         stars: Set(payload.stars),
         created_at: Set(Utc::now()),
         ..Default::default()
@@ -105,14 +139,30 @@ pub async fn build_review_response(
         id: record.id,
         stars: record.stars,
         reviewer_name: reviewer.username,
-        llm_model: super::llm_models::build_llm_model_response(
-            state,
-            llm_model::Entity::find_by_id(record.llm_model_id)
+        llm_model: super::llm_models::build_llm_model_summary_response(
+            &llm_model::Entity::find_by_id(record.llm_model_id)
                 .one(&state.database)
                 .await?
                 .ok_or(ApiError::NotFound)?,
-        )
-        .await?,
+        ),
+        llm_framework: {
+            let framework = llm_framework::Entity::find_by_id(record.llm_framework_id)
+                .one(&state.database)
+                .await?
+                .ok_or(ApiError::NotFound)?;
+
+            LlmFrameworkSummaryResponse {
+                id: framework.id,
+                name: framework.name,
+                slug: framework.slug,
+            }
+        },
+        thinking_effort: super::llm_models::build_thinking_effort_response(
+            llm_model_thinking_effort::Entity::find_by_id(record.llm_model_thinking_effort_id)
+                .one(&state.database)
+                .await?
+                .ok_or(ApiError::NotFound)?,
+        ),
         created_at: record.created_at,
     })
 }

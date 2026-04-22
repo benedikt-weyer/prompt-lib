@@ -8,6 +8,8 @@ pub struct Model {
     pub prompt_id: i32,
     pub reviewer_id: i32,
     pub llm_model_id: i32,
+    pub llm_framework_id: i32,
+    pub llm_model_thinking_effort_id: i32,
     pub stars: i16,
     pub created_at: DateTimeUtc,
 }
@@ -38,6 +40,22 @@ pub enum Relation {
         on_delete = "Restrict"
     )]
     LlmModel,
+    #[sea_orm(
+        belongs_to = "super::llm_framework::Entity",
+        from = "Column::LlmFrameworkId",
+        to = "super::llm_framework::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Restrict"
+    )]
+    LlmFramework,
+    #[sea_orm(
+        belongs_to = "super::llm_model_thinking_effort::Entity",
+        from = "Column::LlmModelThinkingEffortId",
+        to = "super::llm_model_thinking_effort::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Restrict"
+    )]
+    LlmModelThinkingEffort,
 }
 
 impl Related<super::prompt::Entity> for Entity {
@@ -55,6 +73,18 @@ impl Related<super::user::Entity> for Entity {
 impl Related<super::llm_model::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::LlmModel.def()
+    }
+}
+
+impl Related<super::llm_framework::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::LlmFramework.def()
+    }
+}
+
+impl Related<super::llm_model_thinking_effort::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::LlmModelThinkingEffort.def()
     }
 }
 

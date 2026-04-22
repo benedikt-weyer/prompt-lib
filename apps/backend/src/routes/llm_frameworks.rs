@@ -3,9 +3,9 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::routing::get;
 use axum::{Json, Router};
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
-use crate::entities::{llm_framework, llm_model};
+use crate::entities::llm_framework;
 use crate::error::ApiError;
 use crate::models::{CreateLlmFrameworkRequest, LlmFrameworkResponse};
 use crate::state::AppState;
@@ -90,20 +90,15 @@ async fn create_llm_framework(
 }
 
 pub async fn build_framework_response(
-    state: &AppState,
+    _state: &AppState,
     record: llm_framework::Model,
 ) -> Result<LlmFrameworkResponse, ApiError> {
-    let model_count = llm_model::Entity::find()
-        .filter(llm_model::Column::FrameworkId.eq(record.id))
-        .count(&state.database)
-        .await?;
-
     Ok(LlmFrameworkResponse {
         id: record.id,
         name: record.name,
         slug: record.slug,
         description: record.description,
-        model_count,
+        model_count: 0,
     })
 }
 

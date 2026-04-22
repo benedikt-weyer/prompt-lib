@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { apiUrl, fetchLlmModels } from "@/lib/api";
-import type { CatalogLlmModel, CatalogReview } from "@/lib/types";
+import { apiUrl, fetchLlmFrameworks, fetchLlmModels } from "@/lib/api";
+import type { CatalogLlmFramework, CatalogLlmModel, CatalogReview } from "@/lib/types";
 
 type CreateReviewResult = CatalogReview & {
   message?: string;
@@ -19,35 +19,65 @@ type CreateReviewFormProps = {
   onCreated: (review: CatalogReview) => void;
 };
 
-export function CreateReviewForm({ promptId, onCreated }: CreateReviewFormProps) {
+function getReviewPrerequisiteMessage(models: CatalogLlmModel[], frameworks: CatalogLlmFramework[]) {
+  if (models.length === 0 && frameworks.length === 0) {
+    return (
+      <>
+        Create a <Link href="/models/new" className="font-medium text-primary">model</Link> and a <Link href="/frameworks/new" className="font-medium text-primary">framework</Link> before adding reviews.
+      </>
+    );
+  }
+
+  if (models.length === 0) {
+    return (
+      <>
+        Create a <Link href="/models/new" className="font-medium text-primary">model</Link> before adding reviews.
+      </>
+    );
+  }
+
+  return (
+    <>
+      Create a <Link href="/frameworks/new" className="font-medium text-primary">framework</Link> before adding reviews.
+    </>
+  );
+}
+
+export function CreateReviewForm({ promptId, onCreated }: Readonly<CreateReviewFormProps>) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [models, setModels] = useState<CatalogLlmModel[]>([]);
+  const [frameworks, setFrameworks] = useState<CatalogLlmFramework[]>([]);
   const [loadingModels, setLoadingModels] = useState(true);
+  const [loadingFrameworks, setLoadingFrameworks] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadModels() {
+    async function loadMetadata() {
       try {
-        const payload = await fetchLlmModels();
+        const [loadedModels, loadedFrameworks] = await Promise.all([fetchLlmModels(), fetchLlmFrameworks()]);
+
         if (!cancelled) {
-          setModels(payload);
+          setModels(loadedModels);
+          setFrameworks(loadedFrameworks);
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Failed to load models.");
+          setError(loadError instanceof Error ? loadError.message : "Failed to load review metadata.");
         }
       } finally {
         if (!cancelled) {
           setLoadingModels(false);
+          setLoadingFrameworks(false);
         }
       }
     }
 
-    void loadModels();
+    void loadMetadata();
 
     return () => {
       cancelled = true;
@@ -60,9 +90,13 @@ export function CreateReviewForm({ promptId, onCreated }: CreateReviewFormProps)
 
     const starsValue = formData.get("stars");
     const modelValue = formData.get("llmModelId");
+    const frameworkValue = formData.get("llmFrameworkId");
+    const thinkingEffortValue = formData.get("thinkingEffortId");
 
     const stars = typeof starsValue === "string" ? Number(starsValue) : Number.NaN;
     const llmModelId = typeof modelValue === "string" ? Number(modelValue) : Number.NaN;
+    const llmFrameworkId = typeof frameworkValue === "string" ? Number(frameworkValue) : Number.NaN;
+    const thinkingEffortId = typeof thinkingEffortValue === "string" ? Number(thinkingEffortValue) : Number.NaN;
 
     try {
       const response = await fetch(`${apiUrl}/api/prompts/${promptId}/reviews`, {
@@ -74,6 +108,8 @@ export function CreateReviewForm({ promptId, onCreated }: CreateReviewFormProps)
         body: JSON.stringify({
           stars,
           llm_model_id: llmModelId,
+          llm_framework_id: llmFrameworkId,
+          llm_model_thinking_effort_id: thinkingEffortId,
         }),
       });
 
@@ -106,13 +142,16 @@ export function CreateReviewForm({ promptId, onCreated }: CreateReviewFormProps)
     );
   }
 
-  if (!loadingModels && models.length === 0) {
+  if (!loadingModels && !loadingFrameworks && (models.length === 0 || frameworks.length === 0)) {
     return (
       <p className="text-sm text-muted-foreground">
-        Create a <Link href="/frameworks/new" className="font-medium text-primary">framework</Link> and a <Link href="/models/new" className="font-medium text-primary">model</Link> before adding reviews.
+        {getReviewPrerequisiteMessage(models, frameworks)}
       </p>
     );
   }
+
+  const selectedModel = models.find((model) => String(model.id) === selectedModelId) ?? null;
+  const availableThinkingEfforts = selectedModel?.thinking_efforts ?? [];
 
   return (
     <>
@@ -130,14 +169,57 @@ export function CreateReviewForm({ promptId, onCreated }: CreateReviewFormProps)
             disabled={pending || loadingModels}
             required
             className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            defaultValue=""
+            value={selectedModelId}
+            onChange={(event) => {
+              setSelectedModelId(event.target.value);
+            }}
           >
             <option value="" disabled>
               {loadingModels ? "Loading models..." : "Select a model"}
             </option>
             {models.map((model) => (
               <option key={model.id} value={model.id}>
-                {model.name} · {model.thinking_effort} · {model.framework.name}
+                {model.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="thinkingEffortId">Thinking effort</Label>
+          <select
+            id="thinkingEffortId"
+            name="thinkingEffortId"
+            disabled={pending || loadingModels || selectedModel === null}
+            required
+            className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            defaultValue=""
+          >
+            <option value="" disabled>
+              {selectedModel === null ? "Select a model first" : "Select a thinking effort"}
+            </option>
+            {availableThinkingEfforts.map((thinkingEffort) => (
+              <option key={thinkingEffort.id} value={thinkingEffort.id}>
+                {thinkingEffort.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="llmFrameworkId">Framework</Label>
+          <select
+            id="llmFrameworkId"
+            name="llmFrameworkId"
+            disabled={pending || loadingFrameworks}
+            required
+            className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            defaultValue=""
+          >
+            <option value="" disabled>
+              {loadingFrameworks ? "Loading frameworks..." : "Select a framework"}
+            </option>
+            {frameworks.map((framework) => (
+              <option key={framework.id} value={framework.id}>
+                {framework.name}
               </option>
             ))}
           </select>
@@ -162,7 +244,7 @@ export function CreateReviewForm({ promptId, onCreated }: CreateReviewFormProps)
             ))}
           </select>
         </div>
-        <Button type="submit" disabled={pending || authLoading || loadingModels}>
+        <Button type="submit" disabled={pending || authLoading || loadingModels || loadingFrameworks}>
           {pending ? "Adding review..." : "Add review"}
         </Button>
       </form>
