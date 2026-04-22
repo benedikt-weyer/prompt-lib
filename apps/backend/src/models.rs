@@ -1,6 +1,36 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PromptExecutionType {
+    Agent,
+    Plan,
+    Ask,
+    #[default]
+    Unknown,
+}
+
+impl PromptExecutionType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Agent => "agent",
+            Self::Plan => "plan",
+            Self::Ask => "ask",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    pub fn from_db(value: &str) -> Self {
+        match value {
+            "agent" => Self::Agent,
+            "plan" => Self::Plan,
+            "ask" => Self::Ask,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct AuthUserResponse {
     pub id: i32,
@@ -92,6 +122,7 @@ pub struct PromptResponse {
     pub name: String,
     pub slug: String,
     pub prompt: String,
+    pub execution_type: PromptExecutionType,
     pub is_public: bool,
     pub author_name: String,
     pub category: CategoryResponse,
@@ -181,6 +212,8 @@ pub struct CreatePromptRequest {
     pub name: String,
     pub prompt: String,
     #[serde(default)]
+    pub execution_type: PromptExecutionType,
+    #[serde(default)]
     pub is_public: bool,
 }
 
@@ -194,6 +227,8 @@ pub struct UpdatePromptRequest {
     pub category_id: i32,
     pub name: String,
     pub prompt: String,
+    #[serde(default)]
+    pub execution_type: PromptExecutionType,
     pub is_public: bool,
 }
 

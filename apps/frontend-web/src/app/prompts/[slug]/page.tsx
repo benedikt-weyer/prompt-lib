@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiUrl, fetchPromptBySlug, fetchReviews } from "@/lib/api";
+import { getPromptExecutionTypeLabel } from "@/lib/prompt-execution-type";
 import type { CatalogPrompt, CatalogReview } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -290,6 +291,9 @@ function PromptMainSection({
           <div className="flex flex-wrap gap-2">
             <Badge className="rounded-full bg-secondary text-secondary-foreground">{prompt.category.name}</Badge>
             <Badge variant="outline" className="rounded-full">{prompt.review_count} review runs</Badge>
+            <Badge variant="outline" className="rounded-full">
+              {getPromptExecutionTypeLabel(prompt.execution_type)}
+            </Badge>
             <Badge variant="outline" className="rounded-full">{prompt.is_public ? "Public" : "Private"}</Badge>
             <Badge variant="outline" className="rounded-full">
               {prompt.average_stars === null ? "No ratings yet" : `Average ${prompt.average_stars} / 10`}

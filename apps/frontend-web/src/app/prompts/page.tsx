@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchPrompts } from "@/lib/api";
+import { getPromptExecutionTypeLabel } from "@/lib/prompt-execution-type";
 import type { CatalogPrompt } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +98,7 @@ export default function PromptsPage() {
                 <div className="flex flex-wrap gap-2">
                   <Badge className="rounded-full bg-secondary text-secondary-foreground">{prompt.category.name}</Badge>
                   <Badge variant="outline" className="rounded-full">{prompt.review_count} reviews</Badge>
+                  <Badge variant="outline" className="rounded-full">{getPromptExecutionTypeLabel(prompt.execution_type)}</Badge>
                   <Badge variant="outline" className="rounded-full">
                     {prompt.is_public ? "Public" : "Private"}
                   </Badge>

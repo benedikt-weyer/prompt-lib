@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl, fetchCategories } from "@/lib/api";
-import type { CatalogCategory, CatalogPrompt } from "@/lib/types";
+import { getPromptExecutionTypeLabel, promptExecutionTypeOptions } from "@/lib/prompt-execution-type";
+import type { CatalogCategory, CatalogPrompt, PromptExecutionType } from "@/lib/types";
 
 type CreatePromptResult = CatalogPrompt & {
   message?: string;
@@ -93,11 +94,19 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
     const nameValue = formData.get("name");
     const promptValue = formData.get("prompt");
     const categoryValue = formData.get("categoryId");
+    const executionTypeValue = formData.get("executionType");
     const visibilityValue = formData.get("visibility");
 
     const name = typeof nameValue === "string" ? nameValue.trim() : "";
     const prompt = typeof promptValue === "string" ? promptValue.trim() : "";
     const categoryId = typeof categoryValue === "string" ? Number(categoryValue) : Number.NaN;
+    const executionType: PromptExecutionType =
+      executionTypeValue === "agent" ||
+      executionTypeValue === "plan" ||
+      executionTypeValue === "ask" ||
+      executionTypeValue === "unknown"
+        ? executionTypeValue
+        : "unknown";
     const isPublic = visibilityValue === "public";
 
     try {
@@ -113,6 +122,7 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
           name,
           prompt,
           category_id: categoryId,
+          execution_type: executionType,
           is_public: isPublic,
         }),
         },
@@ -202,6 +212,25 @@ export function CreatePromptForm({ initialPrompt }: Readonly<CreatePromptFormPro
             disabled={pending}
             required
           />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="executionType">Execution type</Label>
+          <select
+            id="executionType"
+            name="executionType"
+            disabled={pending}
+            className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            defaultValue={initialPrompt?.execution_type ?? "unknown"}
+          >
+            {promptExecutionTypeOptions.map((executionType) => (
+              <option key={executionType} value={executionType}>
+                {getPromptExecutionTypeLabel(executionType)}
+              </option>
+            ))}
+          </select>
+          <p className="text-sm text-muted-foreground">
+            Use this preset to describe how the prompt is intended to execute: agent, plan, ask, or unknown.
+          </p>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="visibility">Visibility</Label>

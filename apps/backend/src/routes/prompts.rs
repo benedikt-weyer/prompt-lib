@@ -7,7 +7,10 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveM
 
 use crate::entities::{category, prompt, review, user};
 use crate::error::ApiError;
-use crate::models::{CategoryResponse, CreatePromptRequest, PromptResponse, UpdatePromptRequest, UpdatePromptVisibilityRequest};
+use crate::models::{
+    CategoryResponse, CreatePromptRequest, PromptExecutionType, PromptResponse,
+    UpdatePromptRequest, UpdatePromptVisibilityRequest,
+};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -99,6 +102,7 @@ async fn create_prompt(
         name: Set(name),
         slug: Set(slug),
         prompt: Set(prompt_body),
+        execution_type: Set(payload.execution_type.as_str().to_string()),
         is_public: Set(payload.is_public),
         created_at: Set(Utc::now()),
         updated_at: Set(Utc::now()),
@@ -191,6 +195,7 @@ async fn update_prompt(
     active_model.name = Set(name);
     active_model.slug = Set(slug);
     active_model.prompt = Set(prompt_body);
+    active_model.execution_type = Set(payload.execution_type.as_str().to_string());
     active_model.is_public = Set(payload.is_public);
     active_model.updated_at = Set(Utc::now());
     let updated = active_model.update(&state.database).await?;
@@ -262,6 +267,7 @@ async fn build_prompt_response(
         name: record.name,
         slug: record.slug,
         prompt: record.prompt,
+        execution_type: PromptExecutionType::from_db(&record.execution_type),
         is_public: record.is_public,
         author_name: author.username,
         category: CategoryResponse {

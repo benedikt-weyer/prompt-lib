@@ -10,6 +10,7 @@ pub struct Model {
     pub name: String,
     pub slug: String,
     pub prompt: String,
+    pub execution_type: String,
     pub is_public: bool,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,

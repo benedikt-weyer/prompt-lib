@@ -66,12 +66,15 @@ export type CatalogPrompt = {
   name: string;
   slug: string;
   prompt: string;
+  execution_type: PromptExecutionType;
   is_public: boolean;
   author_name: string;
   category: CatalogCategory;
   review_count: number;
   average_stars: number | null;
 };
+
+export type PromptExecutionType = "agent" | "plan" | "ask" | "unknown";
 
 export type Category = {
   id: string;
